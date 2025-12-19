@@ -4,7 +4,7 @@ import { router } from './routing.js';
 let userSession = null;
 
 export const auth = {
-    // Oturum Kontrolü
+    // Oturum Kontrolü (Sayfa yenilenince çalışır)
     checkSession() {
         try {
             const storedSession = localStorage.getItem('kys_user_session');
@@ -19,7 +19,7 @@ export const auth = {
         return false;
     },
 
-    // Mevcut Kullanıcı Bilgisi
+    // Mevcut Kullanıcı Bilgisi (Diğer dosyalardan çağrılır)
     getUser() {
         return userSession;
     },
@@ -27,29 +27,33 @@ export const auth = {
     // Giriş İşlemi
     login: async (username, password) => {
         try {
+            // api.js üzerinden Java Backend'e istek at
             const userData = await api.login(username, password);
             
-            // Başarılı Giriş
+            // Backend'den başarılı cevap geldiyse (userData bir obje ve id'si varsa)
             if (userData && userData.id) {
                 userSession = userData;
                 localStorage.setItem('kys_user_session', JSON.stringify(userData));
                 
-                // Ekranları değiştir (Hata önleyici kontrollerle)
+                // Ekranları değiştir (Giriş -> Dashboard)
                 const authContainer = document.getElementById('auth-container');
                 const dashboardScreen = document.getElementById('dashboard-screen');
                 
                 if (authContainer) authContainer.classList.add('hidden');
                 if (dashboardScreen) dashboardScreen.style.display = 'flex';
                 
+                // Rol göstergesi varsa güncelle
+                const roleDisplay = document.getElementById('user-role-display');
+                if(roleDisplay) roleDisplay.innerText = userData.yetki || userData.roleType;
+
                 // Anasayfaya yönlendir
                 router.navigate('home');
                 return true;
             } else {
-                // Başarısız Giriş (api.login false döndü)
+                // Başarısız Giriş
                 return false; 
             }
         } catch (error) {
-            // Bir hata olursa fırlat (app.js bunu yakalayıp ekrana basacak)
             throw error;
         }
     },
@@ -58,6 +62,7 @@ export const auth = {
     logout: () => {
         userSession = null;
         localStorage.removeItem('kys_user_session');
-        window.location.reload(); // En temiz çıkış: Sayfayı yenile
+        localStorage.removeItem('last_route'); // Son kalınan sayfayı da unut
+        window.location.reload(); // Sayfayı yenileyerek temiz başlangıç yap
     }
 };

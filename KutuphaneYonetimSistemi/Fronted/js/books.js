@@ -1,11 +1,13 @@
 import { api } from './api.js';
 import { auth } from './auth.js';
 import { showToast } from './app.js';
+// router kullanılmıyorsa import etmeye gerek yok ama yapını bozmamak için bırakıyorum
 import { router } from './routing.js';
 
 // --- YÖNETİCİ/PERSONEL İÇİN FORM ---
 const renderBookForm = (categories) => {
-    const categoryOptions = categories.map(c => `<option value="${c.kategori_id}">${c.kategori_ad}</option>`).join('');
+    // Java Model: kategoriId ve kategoriAd
+    const categoryOptions = categories.map(c => `<option value="${c.kategoriId}">${c.kategoriAd}</option>`).join('');
     
     return `
         <div class="card">
@@ -42,20 +44,28 @@ const renderBookForm = (categories) => {
 
 // --- YÖNETİCİ/PERSONEL İÇİN TABLO GÖRÜNÜMÜ ---
 const renderAdminTable = (books, categories) => {
-    if (books.length === 0) return '<p class="alert info">Henüz kitap bulunmamaktadır.</p>';
-    const getCategoryName = (id) => categories.find(c => c.kategori_id === id)?.kategori_ad || 'Bilinmeyen';
+    if (!books || books.length === 0) return '<p class="alert info">Henüz kitap bulunmamaktadır.</p>';
+    
+    // Java Model Uyumu: c.kategoriId
+    const getCategoryName = (id) => categories.find(c => c.kategoriId === id)?.kategoriAd || 'Bilinmeyen';
     
     const rows = books.map(kitap => {
-        let stockClass = kitap.kitap_stok === 0 ? 'stock-out' : 'loan-status-ok';
+        // Java Model Uyumu: ktpStok, kitapResim, ktpAd, yazar, kategoriId, ktpId
+        let stockClass = kitap.ktpStok === 0 ? 'stock-out' : 'loan-status-ok';
+        // Resim yoksa varsayılan bir ikon gösterelim
+        let resimHtml = kitap.kitapResim 
+            ? `<img src="${kitap.kitapResim}" alt="Kapak" style="height: 50px; width:auto;">`
+            : `<i class="fas fa-book" style="font-size:24px; color:#ccc;"></i>`;
+
         return `
             <tr>
-                <td><img src="${kitap.kitap_resim}" alt="Kapak" style="height: 50px; width:auto;"></td>
-                <td>${kitap.kitap_ad}</td>
-                <td>${kitap.kitap_yazar}</td>
-                <td>${getCategoryName(kitap.kategori_id)}</td>
-                <td class="${stockClass}" style="text-align:center; font-weight:bold;">${kitap.kitap_stok}</td>
+                <td>${resimHtml}</td>
+                <td>${kitap.ktpAd}</td>
+                <td>${kitap.yazar}</td>
+                <td>${getCategoryName(kitap.kategoriId)}</td>
+                <td class="${stockClass}" style="text-align:center; font-weight:bold;">${kitap.ktpStok}</td>
                 <td>
-                    <button class="btn btn-danger btn-delete-book" data-id="${kitap.kitap_id}">Sil</button>
+                    <button class="btn btn-danger btn-delete-book" data-id="${kitap.ktpId}">Sil</button>
                 </td>
             </tr>
         `;
@@ -76,24 +86,39 @@ const renderAdminTable = (books, categories) => {
 
 // --- ÜYELER İÇİN KATALOG GÖRÜNÜMÜ ---
 const renderMemberCatalog = (books, categories) => {
-    if (books.length === 0) return '<p class="alert info">Kütüphanemizde henüz kitap bulunmamaktadır.</p>';
-    const getCategoryName = (id) => categories.find(c => c.kategori_id === id)?.kategori_ad || 'Genel';
+    if (!books || books.length === 0) return '<p class="alert info">Kütüphanemizde henüz kitap bulunmamaktadır.</p>';
+    // Java Model Uyumu: c.kategoriId
+    const getCategoryName = (id) => categories.find(c => c.kategoriId === id)?.kategoriAd || 'Genel';
 
     const cards = books.map(kitap => {
-        const isOutOfStock = kitap.kitap_stok <= 0;
+        // Java Model Uyumu: ktpStok, kitapResim, ktpAd, yazar, kategoriId, ktpId
+        const isOutOfStock = kitap.ktpStok <= 0;
+        
+        // Stok yoksa butonu pasif yap
         const btnHtml = isOutOfStock 
             ? `<button class="btn" disabled style="background:#ccc; width:100%">Tükendi</button>`
-            : `<button class="btn btn-primary btn-open-borrow-modal" data-id="${kitap.kitap_id}" data-title="${kitap.kitap_ad}" style="width:100%">Ödünç Al</button>`;
+            : `<button class="btn btn-primary btn-open-borrow-modal" data-id="${kitap.ktpId}" data-title="${kitap.ktpAd}" style="width:100%">Ödünç Al</button>`;
+        
+        // Resim alanı (Arkaplan resmi olarak)
+        const imageStyle = kitap.kitapResim 
+            ? `background-image: url('${kitap.kitapResim}');` 
+            : `background-color: #eee; display:flex; align-items:center; justify-content:center;`;
+            
+        const imageContent = kitap.kitapResim ? '' : '<i class="fas fa-book fa-3x" style="color:#ccc"></i>';
 
         return `
             <div class="book-card">
-                <div class="book-image" style="background-image: url('${kitap.kitap_resim}');"></div>
+                <div class="book-image" style="${imageStyle}">
+                    ${imageContent}
+                </div>
                 <div class="book-info">
-                    <span class="book-category">${getCategoryName(kitap.kategori_id)}</span>
-                    <h3 class="book-title">${kitap.kitap_ad}</h3>
-                    <p class="book-author">${kitap.kitap_yazar}</p>
+                    <span class="book-category">${getCategoryName(kitap.kategoriId)}</span>
+                    <h3 class="book-title">${kitap.ktpAd}</h3>
+                    <p class="book-author">${kitap.yazar}</p>
                     <div class="book-footer">
-                        <span class="book-stock ${isOutOfStock ? 'no-stock' : ''}"><i class="fas fa-box"></i> Stok: ${kitap.kitap_stok}</span>
+                        <span class="book-stock ${isOutOfStock ? 'no-stock' : ''}">
+                            <i class="fas fa-box"></i> Stok: ${kitap.ktpStok}
+                        </span>
                     </div>
                     <div style="margin-top: 15px;">${btnHtml}</div>
                 </div>
@@ -108,11 +133,13 @@ const renderMemberCatalog = (books, categories) => {
 export const booksModule = {
     async loadPage(container) {
         const user = auth.getUser();
-        const isAdminOrStaff = user.yetki === 'Yonetici' || user.yetki === 'Personel';
+        // Backend'den roleType: 'staff' veya 'member' geliyor
+        const isAdminOrStaff = user.roleType === 'staff' || user.yetki === 'Yonetici' || user.yetki === 'Personel';
         
         container.innerHTML = `<h1>${isAdminOrStaff ? 'Kitap Yönetimi' : 'Kütüphane Kataloğu'}</h1><p>Yükleniyor...</p>`;
 
         try {
+            // Paralel veri çekme (Kitaplar ve Kategoriler)
             const [categories, books] = await Promise.all([api.getCategories(), api.getBooks()]);
             let htmlContent = "";
 
@@ -145,13 +172,14 @@ const attachAdminListeners = () => {
             e.preventDefault();
             const formData = new FormData(form);
             
+            // api.js'deki addBook fonksiyonu snake_case -> camelCase dönüşümü yapıyor
+            // o yüzden buradaki isimleri değiştirmemize gerek yok
             const kitap = {
                 kitap_ad: formData.get('kitap_ad'),
                 kitap_yazar: formData.get('kitap_yazar'),
                 kategori_id: parseInt(formData.get('kategori_id')),
                 kitap_resim: formData.get('kitap_resim'),
-                kitap_stok: parseInt(formData.get('kitap_stok')),
-                kitap_durum: parseInt(formData.get('kitap_stok')) > 0
+                kitap_stok: parseInt(formData.get('kitap_stok'))
             };
 
             try {
@@ -174,9 +202,8 @@ const attachAdminListeners = () => {
         });
     }
 
-    // --- 2. KİTAP SİLME (HATA BURADAYDI, DÜZELDİ) ---
-    document.querySelectorAll('.btn-delete-book').forEach(btn => { // Değişken adı: btn
-        // DÜZELTME: Aşağıdaki satırda 'button' yerine 'btn' yazıldı.
+    // --- 2. KİTAP SİLME ---
+    document.querySelectorAll('.btn-delete-book').forEach(btn => {
         btn.addEventListener('click', (e) => { 
             const bookId = parseInt(e.target.dataset.id);
 
@@ -237,7 +264,9 @@ const attachMemberListeners = () => {
 
             // Modalı Göster
             modal.classList.remove('hidden');
-            setTimeout(() => modal.classList.add('show'), 10); // Animasyon için
+            // CSS transition için ufak bir gecikme ile show ekle
+            setTimeout(() => modal.classList.add('show'), 10); 
+            modal.style.display = 'flex'; // CSS override gerekebilir
         });
     });
 
@@ -245,14 +274,16 @@ const attachMemberListeners = () => {
     closeBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             modal.classList.remove('show');
-            setTimeout(() => modal.classList.add('hidden'), 300);
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.style.display = 'none';
+            }, 300);
         });
     });
 
     // 3. Form Submit (Onaylama)
     if (borrowForm) {
-        // Dinleyiciyi temizlemek için replaceWith tekniği veya sadece bir kere tanımlandığından emin olma
-        // Basitlik için burada direkt ekliyoruz, sayfa yenilendiği için sorun olmaz.
+        // Eski event listener'ları temizlemek için klonlama yöntemi veya onsubmit kullanımı
         borrowForm.onsubmit = async (e) => {
             e.preventDefault();
             const user = auth.getUser();
@@ -267,12 +298,24 @@ const attachMemberListeners = () => {
             }
 
             try {
-                await api.addLoan(user.id, kitapId, alis, iade);
+                // DÜZELTME: api.js'deki addLoan artık tek bir OBJE bekliyor.
+                // Eskiden: api.addLoan(user.id, kitapId, alis, iade) idi.
+                // Yeni hali:
+                await api.addLoan({
+                    uye_id: user.id || user.uye_id, // Hangisi varsa
+                    kitap_id: kitapId,
+                    odunc_tarihi: alis,
+                    iade_tarihi: iade
+                });
+                
                 showToast("Kitap başarıyla ödünç alındı!", "success");
                 
                 // Modalı Kapat
                 modal.classList.remove('show');
-                setTimeout(() => modal.classList.add('hidden'), 300);
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                    modal.style.display = 'none';
+                }, 300);
 
                 // Sayfayı Yenile (Stok değişimi için)
                 booksModule.loadPage(document.getElementById('main-content'));

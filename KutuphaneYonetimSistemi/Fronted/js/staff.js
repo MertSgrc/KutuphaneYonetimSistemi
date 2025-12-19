@@ -1,6 +1,6 @@
 import { api } from './api.js';
 import { auth } from './auth.js';
-import { showToast } from './app.js'; // İMPORT EKLENDİ
+import { showToast } from './app.js';
 
 const renderStaffForm = () => `
     <div class="card">
@@ -22,14 +22,19 @@ const renderStaffForm = () => `
 `;
 
 const renderStaffList = (staff) => {
-    if (staff.length === 0) return '<p class="alert info">Personel bulunamadı.</p>';
+    if (!staff || staff.length === 0) return '<p class="alert info">Personel bulunamadı.</p>';
     const currentUser = auth.getUser();
 
-    const rows = staff.map(p => `
+    const rows = staff.map(p => {
+        // Java Model Uyumu: kullaniciAdi (camelCase)
+        // Backend 'kullaniciAdi' gönderir.
+        const kAdi = p.kullaniciAdi || p.kullanici_adi; 
+        
+        return `
         <tr>
             <td>${p.personel_id}</td>
             <td>${p.personel_ad} ${p.personel_soyad}</td>
-            <td>${p.kullanici_adi}</td>
+            <td>${kAdi}</td>
             <td>${p.yetki}</td>
             <td>
                 ${p.personel_id !== currentUser.id ? 
@@ -37,7 +42,7 @@ const renderStaffList = (staff) => {
                   '<span style="color:#aaa; font-size:0.9em;">(Siz)</span>'}
             </td>
         </tr>
-    `).join('');
+    `}).join('');
 
     return `
         <div class="card">
@@ -57,45 +62,27 @@ const fetchAndRenderStaff = async (container) => {
         const staff = await api.getStaff();
         container.innerHTML = renderStaffList(staff);
         
-        // Silme dinleyicisi
         container.querySelectorAll('.btn-delete-staff').forEach(btn => {
-            btn.addEventListener('click', (e) => { // async'i buradan kaldırdık, aşağıya taşıdık
+            btn.addEventListener('click', (e) => {
                 const staffId = parseInt(e.target.dataset.id);
 
-                // 1. Kullanıcıya sor (Eski confirm yerine)
                 Swal.fire({
                     title: 'Emin misiniz?',
-                    text: "Bu personeli silmek istediğinize emin misiniz? Bu işlem geri alınamaz!",
+                    text: "Bu personeli silmek istediğinize emin misiniz?",
                     icon: 'warning',
                     showCancelButton: true,
-                    confirmButtonColor: '#d33', // Silme butonu kırmızı
+                    confirmButtonColor: '#d33',
                     cancelButtonColor: '#3085d6',
                     confirmButtonText: 'Evet, Sil',
                     cancelButtonText: 'Vazgeç'
                 }).then(async (result) => {
-                    
-                    // 2. Kullanıcı "Evet" derse işlemi yap
                     if (result.isConfirmed) {
                         try {
                             await api.deleteStaff(staffId);
-                            
-                            // Başarılı olursa büyük yeşil onay
-                            Swal.fire(
-                                'Silindi!',
-                                'Personel başarıyla silindi.',
-                                'success'
-                            );
-
-                            // Listeyi yenile
+                            Swal.fire('Silindi!', 'Personel başarıyla silindi.', 'success');
                             fetchAndRenderStaff(container);
-                            
                         } catch(err) { 
-                            // Hata olursa kırmızı uyarı
-                            Swal.fire(
-                                'Hata!',
-                                err.message,
-                                'error'
-                            );
+                            Swal.fire('Hata!', err.message, 'error');
                         }
                     }
                 });
@@ -103,7 +90,6 @@ const fetchAndRenderStaff = async (container) => {
         });
 
     } catch (error) {
-        // Liste yüklenemezse sayfaya hata bas (Burası HTML içi olduğu için alert değil, kalabilir)
         container.innerHTML = `<p class="alert error" style="color:red; text-align:center;">Hata: ${error.message}</p>`;
     }
 };
@@ -114,6 +100,8 @@ const attachFormListener = () => {
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(form);
+            
+            // api.js addStaff fonksiyonu 'kullanici_adi' -> 'kullaniciAdi' dönüşümünü yapar.
             const data = Object.fromEntries(formData.entries());
 
             try {

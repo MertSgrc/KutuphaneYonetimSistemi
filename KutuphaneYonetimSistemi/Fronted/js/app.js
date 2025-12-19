@@ -101,16 +101,51 @@ document.addEventListener('DOMContentLoaded', () => {
             const formData = new FormData(registerForm);
             const data = Object.fromEntries(formData.entries());
 
+            // Butonu kilitle
+            const btn = registerForm.querySelector('button');
+            const originalText = btn.innerText;
+            btn.textContent = 'İşleniyor...';
+            btn.disabled = true;
+
             try {
+                // 1. Kayıt İsteği Gönder (Mail gider)
                 await api.registerMember(data);
-                showToast('Üyelik kaydı başarılı! Giriş yapabilirsiniz.', 'success');
-                registerForm.reset();
                 
-                // Otomatik giriş ekranına dön
-                registerBox.classList.add('hidden');
-                loginBox.classList.remove('hidden');
+                // 2. Başarılıysa Kod Doğrulama Penceresini Aç
+                const { value: code } = await Swal.fire({
+                    title: 'Doğrulama Kodu',
+                    input: 'text',
+                    inputLabel: `Lütfen ${data.uye_email} adresine gönderilen 6 haneli kodu giriniz.`,
+                    inputPlaceholder: '123456',
+                    showCancelButton: false,
+                    allowOutsideClick: false,
+                    confirmButtonText: 'Doğrula',
+                    inputValidator: (value) => {
+                        if (!value) return 'Kodu girmelisiniz!';
+                    }
+                });
+
+                if (code) {
+                    // 3. Kodu Doğrula
+                    await api.verifyEmail(data.uye_email, code);
+                    
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Tebrikler!',
+                        text: 'Hesabınız doğrulandı. Şimdi giriş yapabilirsiniz.',
+                        confirmButtonText: 'Girişe Git'
+                    }).then(() => {
+                        registerForm.reset();
+                        document.getElementById('register-box').classList.add('hidden');
+                        document.getElementById('login-box').classList.remove('hidden');
+                    });
+                }
+
             } catch (err) {
-                showToast('Kayıt başarısız: ' + err.message, 'error');
+                Swal.fire('Hata', err.message, 'error');
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
             }
         });
     }

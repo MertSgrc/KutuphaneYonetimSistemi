@@ -7,15 +7,16 @@ export const categoriesModule = {
         try {
             const categories = await api.getCategories();
 
-            const categoryRows = categories.map(cat => {
-                // İsim kontrolü: Hangisi doluysa onu al, yoksa 'İsimsiz' yaz
-                const name = cat.kategori_ad || cat.ad || 'İsimsiz';
+            // SIRA NUMARASI EKLEME (index + 1)
+            const categoryRows = categories.map((cat, index) => {
+                const name = cat.kategoriAd || 'İsimsiz'; 
+                const id = cat.kategoriId; // Silme işlemi için gerçek ID lazım
+
                 return `
                 <tr>
-                    <td>${cat.id}</td>
-                    <td><strong>${name}</strong></td>
+                    <td style="font-weight:bold;">${index + 1}</td> <td>${name}</td>
                     <td>
-                        <button class="btn btn-sm btn-danger btn-delete-cat" data-id="${cat.id}" data-name="${name}">
+                        <button class="btn btn-sm btn-danger btn-delete-cat" data-id="${id}" data-name="${name}">
                             <i class="fas fa-trash"></i> Sil
                         </button>
                     </td>
@@ -42,8 +43,7 @@ export const categoriesModule = {
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th style="width: 50px;">ID</th>
-                                <th>Kategori Adı</th>
+                                <th style="width: 50px;">#</th> <th>Kategori Adı</th>
                                 <th style="width: 100px;">İşlem</th>
                             </tr>
                         </thead>
@@ -73,8 +73,7 @@ const attachCategoryListeners = (container) => {
             if (!val) return;
 
             try {
-                // API'ye obje olarak gönderiyoruz, api.js bunu çözecek
-                await api.addCategory({ kategori_ad: val });
+                await api.addCategory({ kategoriAd: val });
                 
                 Swal.fire({
                     icon: 'success',
@@ -106,7 +105,14 @@ const attachCategoryListeners = (container) => {
                 if (result.isConfirmed) {
                     try {
                         await api.deleteCategory(id);
-                        Swal.fire('Silindi', '', 'success');
+                        
+                        Swal.fire({
+                            title: 'Silindi', 
+                            icon: 'success',
+                            timer: 1000,
+                            showConfirmButton: false
+                        });
+                        
                         categoriesModule.loadPage(document.getElementById('main-content'));
                     } catch (error) {
                         Swal.fire('Hata', error.message, 'error');

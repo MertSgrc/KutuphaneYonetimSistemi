@@ -1,381 +1,241 @@
-const delay = 300;
-const FINE_PER_DAY = 5.0; // Günlük ceza miktarını buradan 5 TL olarak güncelledik
-const LOAN_DAYS = 14;
+const API_BASE_URL = "http://localhost:8080/api";
+const FINE_PER_DAY = 5.0; // Günlük ceza miktarı
 
-// --- Helper Functions ---
-const saveToDB = (key, data) => localStorage.setItem(key, JSON.stringify(data));
-const loadFromDB = (key, defaultData) => {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : defaultData;
-};
+// --- Yardımcı Fetch Fonksiyonu ---
+// (Senin gönderdiğin yapıyı aynen korudum, bu kısım harika çalışıyor)
+async function request(endpoint, method = 'GET', body = null) {
+    const headers = {
+        'Content-Type': 'application/json'
+    };
 
-// --- Initial Data (Sadece ilk yüklemede kullanılır) ---
-const initialMembers = [
-    { uye_id: 1, uye_ad: "Ali", uye_soyad: "Yılmaz", uye_telefon: "5551234567", uye_email: "ali@test.com", uye_kayit_tarihi: "2023-10-01", sifre: "1234" },
-    { uye_id: 2, uye_ad: "Ayşe", uye_soyad: "Demir", uye_telefon: "5559876543", uye_email: "ayse@test.com", uye_kayit_tarihi: "2024-01-15", sifre: "1234" }
-];
-const initialBooks = [
-    { 
-        kitap_id: 1, 
-        kategori_id: 1, 
-        kitap_ad: "Temiz Kod", 
-        kitap_yazar: "Robert C. Martin", 
-        kitap_stok: 5, 
-        kitap_durum: true,
-        kitap_resim: "https://m.media-amazon.com/images/I/5154eV8zPIL._SL500_.jpg" 
-    },
-    { 
-        kitap_id: 2, 
-        kategori_id: 2, 
-        kitap_ad: "Sefiller", 
-        kitap_yazar: "Victor Hugo", 
-        kitap_stok: 3, 
-        kitap_durum: true,
-        kitap_resim: "https://i.dr.com.tr/cache/600x600/0/0000000064052_1.jpg" 
+    const options = {
+        method: method,
+        headers: headers
+    };
+
+    if (body) {
+        options.body = JSON.stringify(body);
     }
-];
-const initialPersonel = [
-    { personel_id: 1, personel_ad: "Sistem", personel_soyad: "Yöneticisi", kullanici_adi: "admin", sifre: "12345", yetki: "Yonetici" },
-    { personel_id: 2, personel_ad: "Ahmet", personel_soyad: "Personel", kullanici_adi: "personel", sifre: "12345", yetki: "Personel" }
-];
-const initialCategories = [
-    { id: 1, kategori_ad: "Yazılım" }, // ID isimlendirmesini standartlaştırdık
-    { id: 2, kategori_ad: "Roman" }
-];
 
-// --- Load Initial Data into Memory ---
-// Not: Fonksiyonlar içinde veriyi tazelemek için loadFromDB tekrar çağrılacaktır.
-let mockMembers = loadFromDB('kys_members', initialMembers);
-let mockKitaplar = loadFromDB('kys_books', initialBooks);
-let mockOdunc = loadFromDB('kys_loans', []);
-let mockPersonel = loadFromDB('kys_staff', initialPersonel);
-// Kategorileri initialCategories ile başlatıyoruz ama id yapısına dikkat et
-let mockKategoriler = loadFromDB('kys_categories', initialCategories);
+    try {
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
 
+        // Backend hata döndürürse yakala ve detaylı göster
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`API Hatası (${response.status}): ${errorText}`);
+        }
 
-// --- ID Counters ---
-let nextIds = {
-    uye: mockMembers.length > 0 ? Math.max(...mockMembers.map(m => m.uye_id)) + 1 : 1,
-    personel: mockPersonel.length > 0 ? Math.max(...mockPersonel.map(p => p.personel_id)) + 1 : 1,
-    kitap: mockKitaplar.length > 0 ? Math.max(...mockKitaplar.map(k => k.kitap_id)) + 1 : 1,
-    odunc: mockOdunc.length > 0 ? Math.max(...mockOdunc.map(o => o.odunc_id)) + 1 : 1,
-    // Kategori ID sayacını fonksiyon içinde dinamik hesaplayacağız
-};
+        // DELETE işlemlerinde bazen içerik dönmez, hata yoksa true dönelim
+        if (method === 'DELETE' && (response.status === 204 || response.status === 200)) {
+            return true;
+        }
+
+        // JSON formatında cevap dön
+        return await response.json();
+    } catch (error) {
+        console.error(`İstek Hatası (${endpoint}):`, error);
+        // Hatayı fırlatıyoruz ki auth.js veya app.js bunu yakalayıp ekrana basabilsin
+        throw error;
+    }
+}
 
 export const api = {
-    
+
     // --- GİRİŞ (LOGIN) ---
-    login(identifier, password) {
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                // Verileri tazele
-                mockPersonel = loadFromDB('kys_staff', initialPersonel);
-                mockMembers = loadFromDB('kys_members', initialMembers);
+    // NOT: Senin kodunda tüm listeyi çekip tarayıcıda kontrol ediyorduk.
+    // Ancak Java Controller'ımızda "/login" diye özel ve güvenli bir kapı var.
+    // Orayı kullanmak en doğrusu ve en hatasızıdır. Senin yapına uygun şekilde buraya entegre ettim.
+    login: async (identifier, password) => {
+        try {
+            // Sunucuya "Benim adım bu, şifrem bu, kontrol et" diyoruz.
+            const response = await request('/login', 'POST', { 
+                username: identifier, 
+                password: password 
+            });
+            
+            // Eğer sunucu "Tamam" derse, dönen kullanıcı bilgilerini veriyoruz.
+            // Backend'den { id, ad, roleType... } gibi bir cevap döner.
+            return response;
 
-                // 1. Personel Kontrolü
-                const personel = mockPersonel.find(p => p.kullanici_adi === identifier && p.sifre === password);
-                if (personel) {
-                    resolve({ 
-                        id: personel.personel_id, 
-                        ad: personel.personel_ad, 
-                        soyad: personel.personel_soyad, 
-                        yetki: personel.yetki, 
-                        roleType: 'staff' 
-                    });
-                    return;
-                }
-
-                // 2. Üye Kontrolü
-                const uye = mockMembers.find(m => m.uye_email === identifier && m.sifre === password);
-                if (uye) {
-                    resolve({ 
-                        id: uye.uye_id, 
-                        ad: uye.uye_ad, 
-                        soyad: uye.uye_soyad, 
-                        yetki: 'Uye', 
-                        roleType: 'member',
-                        uye_id: uye.uye_id, // Profil sayfası için
-                        bakiye: uye.bakiye || 100 // Varsayılan bakiye
-                    });
-                    return;
-                }
-
-                resolve(false);
-            }, delay);
-        });
+        } catch (error) {
+            console.error("Giriş başarısız:", error);
+            // Hata durumunda false dönüyoruz ki ekranda "Hatalı şifre" yazabilsin.
+            return false;
+        }
     },
 
-    // --- KATEGORİ İŞLEMLERİ (Sorunsuz Version) ---
-    getCategories: () => {
-        return new Promise((resolve) => {
-            // Direkt localStorage'dan taze çekiyoruz
-            const raw = localStorage.getItem('kys_categories');
-            // Eğer veri yoksa varsayılanı yükle
-            const categories = raw ? JSON.parse(raw) : initialCategories;
-            // Eğer ilk kez çalışıyorsa localStorage'a da yazalım ki sonraki silmeler tutarlı olsun
-            if (!raw) saveToDB('kys_categories', categories);
-            
-            resolve(categories);
-        });
+    // --- KATEGORİ İŞLEMLERİ ---
+    // Controller Endpoint: /categories
+    getCategories: async () => {
+        return await request('/categories');
     },
 
-    addCategory: (veri) => {
-        return new Promise((resolve, reject) => {
-            // 1. En güncel listeyi al
-            let categories = loadFromDB('kys_categories', initialCategories);
-
-            // 2. İsim ayıklama (String mi Obje mi?)
-            let kategAd = '';
-            if (typeof veri === 'object' && veri !== null) {
-                kategAd = veri.kategori_ad || veri.ad;
-            } else {
-                kategAd = veri;
-            }
-
-            if (!kategAd) return reject(new Error("Kategori adı boş olamaz."));
-
-            // 3. ID Hesapla
-            const maxId = categories.reduce((max, c) => (c.id > max ? c.id : max), 0);
+    addCategory: async (categoryData) => {
+        
+        let name;
+        if (typeof categoryData === 'string') {
+            name = categoryData;
+        } else {
             
-            const newCat = { 
-                id: maxId + 1, 
-                kategori_ad: kategAd 
-            };
-
-            // 4. Ekle ve Kaydet
-            categories.push(newCat);
-            saveToDB('kys_categories', categories);
-            resolve(newCat);
-        });
+            name = categoryData.kategoriAd || categoryData.kategori_ad || categoryData.ad;
+        }
+            
+        return await request('/categories', 'POST', { kategoriAd: name });
     },
 
-    deleteCategory: (id) => {
-        return new Promise((resolve, reject) => {
-            // 1. Verileri tazele
-            let categories = loadFromDB('kys_categories', initialCategories);
-            let books = loadFromDB('kys_books', initialBooks);
-
-            const catIndex = categories.findIndex(c => c.id === id);
-            if (catIndex === -1) return reject(new Error("Kategori bulunamadı."));
-
-            // 2. Kitap Kontrolü
-            // Not: Kitaplarda kategori ID'si "kategori_id" olarak geçiyor
-            const booksInCategory = books.filter(b => b.kategori_id === id);
-            if (booksInCategory.length > 0) {
-                return reject(new Error(`Silinemez! Bu kategoride kayıtlı ${booksInCategory.length} adet kitap var.`));
-            }
-
-            // 3. Sil
-            categories.splice(catIndex, 1);
-            saveToDB('kys_categories', categories);
-            
-            resolve({ success: true, message: "Kategori silindi." });
-        });
+    deleteCategory: async (id) => {
+        await request(`/categories/${id}`, 'DELETE');
+        return { success: true, message: "Kategori silindi." };
     },
 
     // --- KİTAP İŞLEMLERİ ---
-    getBooks: () => Promise.resolve(loadFromDB('kys_books', initialBooks)),
-    
-    addBook: (kitap) => {
-        return new Promise(resolve => {
-            let books = loadFromDB('kys_books', initialBooks);
-            const defaultImg = "https://via.placeholder.com/150x220?text=Kitap";
-            
-            // ID Hesapla
-            const maxId = books.length > 0 ? Math.max(...books.map(k => k.kitap_id)) : 0;
-
-            const newK = { 
-                ...kitap, 
-                kitap_id: maxId + 1,
-                kitap_resim: kitap.kitap_resim || defaultImg
-            };
-            books.push(newK);
-            saveToDB('kys_books', books);
-            resolve(newK);
-        });
+    // Controller Endpoint: /books
+    getBooks: async () => {
+        return await request('/books');
     },
 
-    deleteBook: (id) => {
-        return new Promise((resolve) => {
-            let books = loadFromDB('kys_books', initialBooks);
-            books = books.filter(k => k.kitap_id !== id);
-            saveToDB('kys_books', books);
-            resolve({ success: true });
-        });
+    addBook: async (kitapData) => {
+        // Frontend formundan gelen verileri (snake_case), Java 'Kitap' modeline (camelCase) çeviriyoruz.
+        // Kitap.java: ktpAd, yazar, ktpStok, yayinYili...
+        const payload = {
+            ktpAd: kitapData.kitap_ad || kitapData.ktpAd,
+            yazar: kitapData.kitap_yazar || kitapData.yazar,
+            ktpStok: parseInt(kitapData.kitap_stok || kitapData.ktpStok),
+            yayinYili: kitapData.yayin_yili || null, // Tarih formatı: YYYY-MM-DD
+            durum: "Aktif",
+            kitapResim: kitapData.kitap_resim || "",
+            // İlişkisel kayıt için ID gönderiyoruz
+            kategoriId: parseInt(kitapData.kategori_id)
+        };
+        return await request('/books', 'POST', payload);
     },
 
-    // --- ÖDÜNÇ ve İADE İŞLEMLERİ ---
-    getLoans: () => {
-        return new Promise(resolve => {
-            let loans = loadFromDB('kys_loans', []);
-            const today = new Date();
-            today.setHours(0,0,0,0);
+    deleteBook: async (id) => {
+        await request(`/books/${id}`, 'DELETE');
+        return { success: true };
+    },
 
-            // Dinamik Ceza Hesaplama (Sadece görüntüleme için, veritabanına yazmaz)
-            loans = loans.map(o => {
-                if (o.odunc_durum) {
-                    const iadeTarihi = new Date(o.odunc_iade_tarihi || o.iade_tarihi);
-                    if (iadeTarihi < today) {
-                        const diffTime = Math.abs(today - iadeTarihi);
-                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                        o.ceza = diffDays * FINE_PER_DAY;
-                    } else {
-                        o.ceza = 0;
-                    }
+    // --- ÖDÜNÇ (LOAN) İŞLEMLERİ ---
+    // Controller Endpoint: /loans
+    getLoans: async () => {
+        const loans = await request('/loans');
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Java'dan gelen veriye "ceza" bilgisini frontend tarafında hesaplayıp ekliyoruz
+        return loans.map(o => {
+            let cezaMiktari = 0;
+            // Durum kontrolü: Pasif veya İade Edildi değilse ceza hesapla
+            if (o.durum !== "Pasif" && o.durum !== "Iade Edildi") {
+                const iadeTarihi = new Date(o.iadeTarihi || o.iade_tarihi);
+                if (iadeTarihi < today) {
+                    const diffTime = Math.abs(today - iadeTarihi);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    cezaMiktari = diffDays * FINE_PER_DAY;
                 }
-                return o;
-            });
-            resolve(loans);
+            }
+            // Objeye ceza alanını ekle
+            return { ...o, ceza: cezaMiktari };
         });
     },
 
-    addLoan: (arg1, arg2, arg3, arg4) => {
-        return new Promise((resolve, reject) => {
-            let loans = loadFromDB('kys_loans', []);
-            let books = loadFromDB('kys_books', initialBooks);
-            
-            let uye_id, kitap_id, alis, iade;
+   addLoan: async (arg1) => {
+        let payload = {};
 
-            // Parametre kontrolü (Obje mi, ayrı ayrı mı?)
-            if (typeof arg1 === 'object' && arg1 !== null) {
-                uye_id = arg1.uye_id;
-                kitap_id = arg1.kitap_id;
-                alis = arg1.odunc_tarihi;
-                iade = arg1.iade_tarihi;
-            } else {
-                uye_id = arg1;
-                kitap_id = arg2;
-                alis = arg3;
-                iade = arg4;
-            }
-
-            // Kitap ve Stok Kontrolü
-            const kitapIndex = books.findIndex(k => k.kitap_id === kitap_id);
-            if (kitapIndex === -1) return reject(new Error("Kitap bulunamadı!"));
-            if (books[kitapIndex].kitap_stok <= 0) return reject(new Error("Stok Yok"));
-
-            // ID Hesapla
-            const maxLoanId = loans.length > 0 ? Math.max(...loans.map(o => o.odunc_id)) : 0;
-
-            const newLoan = { 
-                odunc_id: maxLoanId + 1, 
-                uye_id: uye_id, 
-                kitap_id: kitap_id, 
-                odunc_alma_tarihi: alis || new Date().toISOString().split('T')[0],
-                odunc_iade_tarihi: iade, 
-                odunc_durum: true, 
-                ceza: 0, 
-                odeme_durumu: false
+        if (typeof arg1 === 'object') {
+            payload = {
+                
+                uye_id: parseInt(arg1.uye_id || arg1.uyeId),
+                
+                ktp_id: parseInt(arg1.kitap_id || arg1.ktpId),
+                
+                odunc_tarihi: arg1.odunc_tarihi || arg1.alis_tarihi,
+                
+                iade_tarihi: arg1.iade_tarihi,
+                
+                durum: "Aktif"
             };
+        } else {
+            console.error("HATA: addLoan fonksiyonuna obje gönderilmelidir.");
+            return;
+        }
 
-            loans.push(newLoan);
-            books[kitapIndex].kitap_stok--; // Stok düş
-            
-            saveToDB('kys_loans', loans);
-            saveToDB('kys_books', books);
-            
-            resolve(newLoan);
-        });
+        // console.log("Gönderilen Veri:", payload); // Hata ayıklama için açabilirsin
+        return await request('/loans', 'POST', payload);
     },
 
-    // Normal İade İşlemi (Cezasız veya personelin manuel iadesi)
-    returnLoan: (id) => {
-        return new Promise((resolve) => {
-            let loans = loadFromDB('kys_loans', []);
-            let books = loadFromDB('kys_books', initialBooks);
-
-            let idx = loans.findIndex(o => o.odunc_id === id);
-            if(idx > -1) {
-                loans[idx].odunc_durum = false; // İade edildi
-                
-                // Stok artır
-                let kIdx = books.findIndex(k => k.kitap_id === loans[idx].kitap_id);
-                if(kIdx > -1) books[kIdx].kitap_stok++;
-                
-                saveToDB('kys_loans', loans);
-                saveToDB('kys_books', books);
-                resolve({success: true, message: "İade alındı"});
-            }
-        });
+    returnLoan: async (id) => {
+        // İade işlemi için Backend'deki DELETE metodunu çağırıyoruz
+        await request(`/loans/${id}`, 'DELETE');
+        return { success: true, message: "Kitap iade alındı." };
     },
 
-    // Ceza Ödeme ve Otomatik İade
-    payFine: (odunc_id, tutar) => {
-        return new Promise((resolve, reject) => {
-            let loans = loadFromDB('kys_loans', []);
-            let books = loadFromDB('kys_books', initialBooks);
-            
-            const loanIndex = loans.findIndex(l => l.odunc_id === odunc_id);
-            if (loanIndex === -1) return reject(new Error("Kayıt bulunamadı."));
+   payFine: async (oduncId, tutar) => {
+        // ARTIK DELETE DEĞİL, POST İLE ÖZEL ENDPOINT'E GİDİYORUZ
+        await request(`/loans/${oduncId}/pay`, 'POST');
+        return { success: true, message: `Ödeme alındı (${tutar} TL) ve kitap iade edildi.` };
+    },
 
-            const loan = loans[loanIndex];
+    payFineWallet: async (oduncId, tutar) => {
+        return await request(`/loans/${oduncId}/pay-wallet`, 'POST', { amount: parseFloat(tutar) });
+    },
 
-            // Ödeme bilgilerini işle
-            loan.ceza_odenen = (loan.ceza_odenen || 0) + tutar;
-            loan.odeme_tarihi = new Date().toISOString().split('T')[0];
-            loan.odeme_yapildi = true; 
-            
-            // --- KRİTİK: Ödeme yapılınca kitap iade alınmış sayılır ---
-            loan.odunc_durum = false; 
-            loan.odunc_iade_tarihi = new Date().toISOString().split('T')[0];
-
-            // Stok artır
-            const kitap = books.find(k => k.kitap_id === loan.kitap_id);
-            if (kitap) {
-                kitap.kitap_stok++;
-                saveToDB('kys_books', books);
-            }
-
-            saveToDB('kys_loans', loans);
-            
-            resolve({ success: true, message: `Ödeme alındı ve kitap iade edildi.` });
-        });
+    // Para Yükle
+    depositMoney: async (uyeId, miktar) => {
+        return await request(`/members/${uyeId}/deposit`, 'POST', { amount: parseFloat(miktar) });
     },
 
     // --- ÜYE İŞLEMLERİ ---
-    getMembers: () => Promise.resolve(loadFromDB('kys_members', initialMembers)),
-    registerMember: (uyeData) => {
-        return new Promise((resolve) => {
-            let members = loadFromDB('kys_members', initialMembers);
-            const maxId = members.length > 0 ? Math.max(...members.map(m => m.uye_id)) : 0;
-            
-            const newUye = { 
-                ...uyeData, 
-                uye_id: maxId + 1,
-                uye_kayit_tarihi: new Date().toISOString().split('T')[0]
-            };
-            members.push(newUye);
-            saveToDB('kys_members', members);
-            resolve(newUye);
-        });
+    // Controller Endpoint: /members
+    getMembers: async () => {
+        return await request('/members');
     },
-    deleteMember: (id) => {
-        return new Promise((resolve) => {
-            let members = loadFromDB('kys_members', initialMembers);
-            members = members.filter(m => m.uye_id !== id);
-            saveToDB('kys_members', members);
-            resolve({ success: true });
-        });
+
+    registerMember: async (uyeData) => {
+        // Java Uye.java Modeli: uye_ad, uye_soyad, uyeEmail, uye_telefon, sifre
+        const payload = {
+            uye_ad: uyeData.uye_ad,
+            uye_soyad: uyeData.uye_soyad,
+            uyeEmail: uyeData.uye_email || uyeData.uyeEmail, // Backend'de camelCase 'uyeEmail'
+            uye_telefon: uyeData.uye_telefon,
+            sifre: uyeData.sifre,
+            // Eğer tarih boşsa bugünü ata
+            uyeKayitTarihi: new Date().toISOString().split('T')[0]
+        };
+        return await request('/members', 'POST', payload);
+    },
+
+    verifyEmail: async (email, code) => {
+        // Backend'deki /api/verify endpoint'ine istek atar
+        return await request('/verify', 'POST', { email, code });
+    },
+
+    deleteMember: async (id) => {
+        await request(`/members/${id}`, 'DELETE');
+        return { success: true };
     },
 
     // --- PERSONEL İŞLEMLERİ ---
-    getStaff: () => Promise.resolve(loadFromDB('kys_staff', initialPersonel)),
-    addStaff: (p) => {
-        return new Promise(resolve => {
-            let staff = loadFromDB('kys_staff', initialPersonel);
-            const maxId = staff.length > 0 ? Math.max(...staff.map(s => s.personel_id)) : 0;
-            const newP = { ...p, personel_id: maxId + 1 };
-            staff.push(newP);
-            saveToDB('kys_staff', staff);
-            resolve(newP);
-        });
+    // Controller Endpoint: /staff
+    getStaff: async () => {
+        return await request('/staff');
     },
-    deleteStaff: (id) => {
-        return new Promise(resolve => {
-            let staff = loadFromDB('kys_staff', initialPersonel);
-            staff = staff.filter(p => p.personel_id !== id);
-            saveToDB('kys_staff', staff);
-            resolve({success: true});
-        });
+
+    addStaff: async (personelData) => {
+        // Java Personel.java Modeli: personel_ad, personel_soyad, kullaniciAdi, sifre, yetki
+        const payload = {
+            personel_ad: personelData.personel_ad,
+            personel_soyad: personelData.personel_soyad,
+            kullaniciAdi: personelData.kullanici_adi || personelData.kullaniciAdi,
+            sifre: personelData.sifre,
+            yetki: personelData.yetki || "Personel"
+        };
+        return await request('/staff', 'POST', payload);
+    },
+
+    deleteStaff: async (id) => {
+        await request(`/staff/${id}`, 'DELETE');
+        return { success: true };
     }
 };

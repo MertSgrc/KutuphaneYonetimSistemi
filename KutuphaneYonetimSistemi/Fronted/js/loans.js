@@ -1,11 +1,14 @@
 import { api } from './api.js';
 
 const renderLoanForm = (members, books) => {
+    // Java Model Uyumu: Uye (uye_id, uye_ad), Kitap (ktpId, ktpAd, ktpStok)
     const memberOptions = members.map(m => `<option value="${m.uye_id}">${m.uye_id} - ${m.uye_ad} ${m.uye_soyad}</option>`).join('');
+    
     // Sadece stokta olan kitapları göster
+    // DİKKAT: Kitap modelinde isimler ktpStok, ktpId, ktpAd
     const bookOptions = books
-        .filter(b => b.kitap_stok > 0)
-        .map(b => `<option value="${b.kitap_id}">${b.kitap_ad} (${b.kitap_stok} adet)</option>`).join('');
+        .filter(b => b.ktpStok > 0)
+        .map(b => `<option value="${b.ktpId}">${b.ktpAd} (${b.ktpStok} adet)</option>`).join('');
 
     return `
         <div class="card">
@@ -42,22 +45,33 @@ const renderLoanForm = (members, books) => {
 };
 
 const renderLoansList = (loans, members, books) => {
-    if (loans.length === 0) return '<p class="alert info">Henüz ödünç işlemi yapılmamıştır.</p>';
+    if (!loans || loans.length === 0) return '<p class="alert info">Henüz ödünç işlemi yapılmamıştır.</p>';
 
     const rows = loans.map(loan => {
-        const memberName = members.find(m => m.uye_id === loan.uye_id)?.uye_ad + " " + members.find(m => m.uye_id === loan.uye_id)?.uye_soyad || 'Bilinmiyor';
-        const bookName = books.find(b => b.kitap_id === loan.kitap_id)?.kitap_ad || 'Bilinmiyor';
+        // Java Model Uyumu (Odunc.java): uye_id, ktp_id, odunc_id (@JsonProperty kullanıldığı için)
+        // Kitap Model Uyumu: ktpId, ktpAd
+        
+        const member = members.find(m => m.uye_id === loan.uye_id);
+        const memberName = member ? `${member.uye_ad} ${member.uye_soyad}` : 'Bilinmiyor';
+        
+        const book = books.find(b => b.ktpId === loan.ktp_id);
+        const bookName = book ? book.ktpAd : 'Bilinmiyor';
 
         // Gecikme Hesaplama
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const iadeTarihi = new Date(loan.odunc_iade_tarihi || loan.iade_tarihi);
+        
+        // Java Model: odunc_tarihi, iade_tarihi
+        const iadeTarihi = new Date(loan.iade_tarihi);
         
         let calculatedFine = 0;
         let isOverdue = false;
 
-        // Kitap hala üyedeyse ve günü geçmişse hesapla
-        if (loan.odunc_durum && iadeTarihi < today) {
+        // Java'da 'durum' String olarak tutuluyor ("Aktif", "İade Edildi", "Pasif")
+        // Kitap hala üyedeyse (İade Edilmediyse) ve günü geçmişse hesapla
+        const isReturned = loan.durum === "İade Edildi" || loan.durum === "Pasif";
+        
+        if (!isReturned && iadeTarihi < today) {
             const diffTime = Math.abs(today - iadeTarihi);
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             calculatedFine = diffDays * 5; // Günlük 5 TL
@@ -67,19 +81,23 @@ const renderLoansList = (loans, members, books) => {
         let statusHtml;
         let actionButton;
 
-        if (!loan.odunc_durum) {
+        if (isReturned) {
             // --- DURUM 1: KİTAP İADE EDİLMİŞ ---
-            
-            // Eğer ödeme yapılarak iade edildiyse (Flag kontrolü)
-            if (loan.odeme_yapildi) {
-                statusHtml = `<span class="badge" style="background-color:#28a745; color:white; padding:5px 10px; border-radius:15px;">
-                                <i class="fas fa-check-circle"></i> Ödeme Alındı, İade Edildi
-                              </span>`;
+            // Eğer veritabanında 'odeme_yapildi' true ise:
+            if (loan.odeme_yapildi === true) {
+                statusHtml = `
+                    <span class="badge" style="background-color:#28a745; color:white; padding:5px 10px; border-radius:15px;">
+                        <i class="fas fa-check-double"></i> Ödeme Alındı, İade Edildi
+                    </span>`;
             } else {
-                // Normal zamanında iade
-                statusHtml = `<span style="color:green; font-weight:bold;">Zamanında İade</span>`;
+                // Normal iade
+                statusHtml = `
+                    <span class="badge" style="background-color:#6c757d; color:white; padding:5px 10px; border-radius:15px;">
+                        <i class="fas fa-check"></i> İade Edildi
+                    </span>`;
             }
-            actionButton = `<button class="btn" disabled style="opacity:0.6; cursor:not-allowed;">İşlem Yok</button>`;
+            
+            actionButton = `<button class="btn" disabled style="opacity:0.6; cursor:not-allowed;">İşlem Tamam</button>`;
         
         } else if (isOverdue) {
             // --- DURUM 2: GECİKMİŞ (BORÇLU) ---
@@ -93,7 +111,7 @@ const renderLoansList = (loans, members, books) => {
             `;
         } else {
             // --- DURUM 3: NORMAL SÜREÇ ---
-            statusHtml = `<span style="color:#007bff; font-weight:bold;">Ödünçte (Süresi Var)</span>`;
+            statusHtml = `<span style="color:#007bff; font-weight:bold;">${loan.durum || 'Ödünçte'}</span>`;
             actionButton = `<button class="btn btn-info btn-return" data-id="${loan.odunc_id}">İade Et</button>`;
         }
 
@@ -102,8 +120,8 @@ const renderLoansList = (loans, members, books) => {
                 <td>${loan.odunc_id}</td>
                 <td>${memberName}</td>
                 <td>${bookName}</td>
-                <td>${loan.odunc_alma_tarihi || '-'}</td>
-                <td>${loan.odunc_iade_tarihi || loan.iade_tarihi}</td>
+                <td>${loan.odunc_tarihi || '-'}</td>
+                <td>${loan.iade_tarihi || '-'}</td>
                 <td>${statusHtml}</td>
                 <td>${actionButton}</td>
             </tr>
@@ -128,22 +146,26 @@ const renderLoansList = (loans, members, books) => {
 const fetchAndRenderLoans = async (container) => {
     container.innerHTML = '<h1>Ödünç ve İade İşlemleri</h1><p class="card" style="text-align: center;">Veriler Yükleniyor...</p>';
     
-    const [loans, members, books] = await Promise.all([
-        api.getLoans(),
-        api.getMembers(),
-        api.getBooks()
-    ]);
-    
-   container.innerHTML = `
-        <h1>Ödünç ve İade İşlemleri</h1>
-        ${renderLoanForm(members, books)}
-        <h2 style="color: var(--primary-color); margin-top: 20px; margin-bottom: 10px;">Tüm Kayıtlar</h2>
-        <div id="loan-list-container">
-            ${renderLoansList(loans, members, books)} </div>
-    `;
-    
-    attachLoanListeners(document.getElementById('loan-list-container'));
-    attachAddLoanListener();
+    try {
+        const [loans, members, books] = await Promise.all([
+            api.getLoans(),
+            api.getMembers(),
+            api.getBooks()
+        ]);
+        
+       container.innerHTML = `
+            <h1>Ödünç ve İade İşlemleri</h1>
+            ${renderLoanForm(members, books)}
+            <h2 style="color: var(--primary-color); margin-top: 20px; margin-bottom: 10px;">Tüm Kayıtlar</h2>
+            <div id="loan-list-container">
+                ${renderLoansList(loans, members, books)} </div>
+        `;
+        
+        attachLoanListeners(document.getElementById('loan-list-container'));
+        attachAddLoanListener();
+    } catch (e) {
+        container.innerHTML = `<div class="alert error">Hata: ${e.message}</div>`;
+    }
 };
 
 const attachAddLoanListener = () => {
@@ -156,7 +178,6 @@ const attachAddLoanListener = () => {
             const oduncVerisi = {
                 uye_id: parseInt(formData.get('uye_id')),
                 kitap_id: parseInt(formData.get('kitap_id')),
-                // YENİ EKLENEN TARİH ALANLARI
                 odunc_tarihi: formData.get('odunc_tarihi'), 
                 iade_tarihi: formData.get('iade_tarihi')
             };
@@ -167,9 +188,7 @@ const attachAddLoanListener = () => {
                  return;
             }
 
-            // API'yi çağırırken verileri obje olarak gönderiyoruz (API'nizin bunu desteklemesi gerekir)
             try {
-                // API çağrısını yeni veri yapısına göre güncelledik
                 await api.addLoan(oduncVerisi); 
                 
                 form.reset();
@@ -193,7 +212,7 @@ const attachAddLoanListener = () => {
 
 export const attachLoanListeners = (container) => {
     
-    // 1. İADE ET BUTONU (Normal İade)
+    // 1. İADE ET BUTONU
     container.querySelectorAll('.btn-return').forEach(button => {
         button.addEventListener('click', (e) => {
             const odunc_id = parseInt(e.target.dataset.id);
@@ -209,12 +228,10 @@ export const attachLoanListeners = (container) => {
                     try {
                         await api.returnLoan(odunc_id);
                         Swal.fire('Başarılı', 'Kitap iade alındı.', 'success');
-                        // Sayfayı yenile (Hangi sayfadaysak onu)
-                        const activeModule = window.location.hash === '#fines' ? finesModule : loansModule; 
-                        // Basitçe o anki container'ı yenileyelim:
+                        
+                        // Listeyi yenile
                         if(typeof fetchAndRenderLoans === 'function') fetchAndRenderLoans(document.getElementById('main-content'));
-                        else if (typeof finesModule !== 'undefined') finesModule.loadPage(document.getElementById('main-content'));
-
+                        
                     } catch (error) {
                         Swal.fire('Hata', error.message, 'error');
                     }
@@ -223,110 +240,100 @@ export const attachLoanListeners = (container) => {
         });
     });
 
-    // 2. CEZA ÖDE BUTONU (KREDİ KARTI SİMÜLASYONU)
+   // 2. CEZA ÖDE BUTONU (SEÇENEKLİ)
     container.querySelectorAll('.btn-pay-fine').forEach(button => {
         button.addEventListener('click', (e) => {
-            // Tıklanan ikon olabilir, closest ile butonu bulalım
             const btn = e.target.closest('.btn-pay-fine');
             const odunc_id = parseInt(btn.dataset.id);
             const ceza = parseFloat(btn.dataset.ceza);
 
+            // ÖDEME YÖNTEMİ SEÇİMİ
             Swal.fire({
-                title: 'Güvenli Ödeme',
-                html: `
-                    <div style="text-align:left; margin-bottom:10px;">
-                        <p style="margin-bottom:10px;">Ödenecek Tutar: <strong style="color:red; font-size:1.2em;">${ceza.toFixed(2)} TL</strong></p>
-                        <label>Kart Sahibi</label>
-                        <input id="cc-name" class="swal2-input" placeholder="Ad Soyad" style="margin-top:5px;">
-                        
-                        <label>Kart Numarası</label>
-                        <input id="cc-number" class="swal2-input" placeholder="0000 0000 0000 0000" maxlength="19" style="margin-top:5px;">
-                        
-                        <div style="display:flex; gap:10px; margin-top:10px;">
-                            <div style="flex:1">
-                                <label>SKT</label>
-                                <input id="cc-exp" class="swal2-input" placeholder="AA/YY" maxlength="5" style="margin-top:5px;"> 
-                            </div>
-                            <div style="flex:1">
-                                <label>CVC</label>
-                                <input id="cc-cvc" class="swal2-input" placeholder="123" maxlength="3" style="margin-top:5px;">
-                            </div>
-                        </div>
-                    </div>
-                `,
+                title: 'Ödeme Yöntemi',
+                text: `Ödenecek Tutar: ${ceza.toFixed(2)} TL`,
+                icon: 'info',
+                showDenyButton: true,
                 showCancelButton: true,
-                confirmButtonText: '<i class="fas fa-lock"></i> Ödemeyi Tamamla',
+                confirmButtonText: '<i class="fas fa-wallet"></i> Cüzdan ile Öde',
+                denyButtonText: '<i class="fas fa-credit-card"></i> Kredi Kartı ile Öde',
                 cancelButtonText: 'Vazgeç',
-                focusConfirm: false,
-                preConfirm: () => {
-                    // Basit Doğrulama
-                    const name = document.getElementById('cc-name').value;
-                    const number = document.getElementById('cc-number').value;
-                    const cvc = document.getElementById('cc-cvc').value;
-
-                    if (!name || !number || !cvc) {
-                        Swal.showValidationMessage('Lütfen tüm kart bilgilerini girin');
-                        return false;
-                    }
-                    if (number.length < 16) {
-                         Swal.showValidationMessage('Geçersiz kart numarası');
-                         return false;
-                    }
-                    return { name, number }; // Verileri döndür
-                }
-            }).then((result) => {
+                confirmButtonColor: '#28a745', // Yeşil (Cüzdan)
+                denyButtonColor: '#007bff'    // Mavi (Kart)
+            }).then(async (result) => {
+                
+                // --- SEÇENEK 1: CÜZDAN İLE ÖDE ---
                 if (result.isConfirmed) {
-                    // ÖDEME SİMÜLASYONU (Bekletme Ekranı)
-                    let timerInterval;
-                    Swal.fire({
-                        title: 'Ödeme İşleniyor...',
-                        html: 'Banka ile iletişim kuruluyor, lütfen bekleyin.',
-                        timer: 2000, // 2 saniye bekle
-                        timerProgressBar: true,
-                        didOpen: () => {
-                            Swal.showLoading();
-                        },
-                        willClose: () => {
-                            clearInterval(timerInterval);
-                        }
-                    }).then(async () => {
-                        try {
-                            await api.payFine(odunc_id, ceza);
-
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Ödeme Başarılı!',
-                                text: 'Tutar tahsil edildi ve kitap iade alındı.',
-                                confirmButtonText: 'Tamam'
-                            }).then(() => { 
-                                
-                                // --- DÜZELTME BAŞLANGICI ---
-                                // Hangi sayfada olduğumuzu kontrol edip ona göre yenileme yapıyoruz
-                                const currentRoute = localStorage.getItem('last_route'); // routing.js'de bunu kaydediyorduk
-
-                                if (currentRoute === 'fines') {
-                                    // Eğer Cezalar sayfasındaysak, Fines modülünü tekrar yükle
-                                    import('./fines.js').then(module => {
-                                        module.finesModule.loadPage(document.getElementById('main-content'));
-                                    });
-                                } else {
-                                    // Değilse (Ödünç sayfasındaysak) Loans modülünü yenile
-                                    if(typeof fetchAndRenderLoans === 'function') {
-                                        fetchAndRenderLoans(document.getElementById('main-content'));
-                                    }
-                                }
-                                // --- DÜZELTME BİTİŞİ ---
-
-                            });
-
-                        } catch (error) {
-                            Swal.fire('Hata', 'Ödeme alınamadı: ' + error.message, 'error');
-                        }
-                    });
+                    try {
+                        const response = await api.payFineWallet(odunc_id, ceza);
+                        Swal.fire('Başarılı!', response.message, 'success');
+                        refreshPage();
+                    } catch (err) {
+                        // Backend "Yetersiz Bakiye" hatası dönerse burada yakalarız
+                        Swal.fire('Hata', err.message, 'error');
+                    }
+                } 
+                
+                // --- SEÇENEK 2: KREDİ KARTI İLE ÖDE (Eski yöntem) ---
+                else if (result.isDenied) {
+                    // Kart girişi ekranını aç (Eski kodunu buraya taşıdık)
+                    openCreditCardModal(odunc_id, ceza);
                 }
             });
         });
     });
+
+    // Yardımcı: Sayfayı yenileme
+    const refreshPage = () => {
+        const currentRoute = localStorage.getItem('last_route');
+        if (currentRoute === 'fines') {
+            import('./fines.js').then(m => m.finesModule.loadPage(document.getElementById('main-content')));
+        } else {
+            if(typeof fetchAndRenderLoans === 'function') fetchAndRenderLoans(document.getElementById('main-content'));
+        }
+    }
+
+    // Yardımcı: Kredi Kartı Modalı (Eski kodun fonksiyon hali)
+    const openCreditCardModal = (odunc_id, ceza) => {
+        Swal.fire({
+            title: 'Güvenli Ödeme (Kart)',
+            html: `
+                <div style="text-align:left;">
+                    <p>Tutar: <strong>${ceza.toFixed(2)} TL</strong></p>
+                    <input id="cc-num" class="swal2-input" placeholder="Kart No" maxlength="19">
+                    <div style="display:flex; gap:10px;">
+                        <input id="cc-exp" class="swal2-input" placeholder="AA/YY" maxlength="5">
+                        <input id="cc-cvc" class="swal2-input" placeholder="CVC" maxlength="3">
+                    </div>
+                </div>`,
+            showCancelButton: true,
+            confirmButtonText: 'Öde',
+            didOpen: () => {
+                // Maskeleme kodları (Kısalttım)
+                const n = Swal.getPopup().querySelector('#cc-num');
+                const e = Swal.getPopup().querySelector('#cc-exp');
+                n.addEventListener('input', ev => {
+                    let v = ev.target.value.replace(/\D/g,''), f='';
+                    for(let i=0;i<v.length;i++){if(i>0&&i%4===0)f+=' ';f+=v[i]}
+                    ev.target.value=f;
+                });
+                e.addEventListener('input', ev => {
+                    let v=ev.target.value.replace(/\D/g,'').substring(0,4);
+                    ev.target.value = v.length>=3 ? v.substring(0,2)+'/'+v.substring(2) : v;
+                });
+            },
+            preConfirm: () => {
+                if(document.getElementById('cc-num').value.length<16) Swal.showValidationMessage('Kart no eksik');
+            }
+        }).then(async (res) => {
+            if (res.isConfirmed) {
+                try {
+                    await api.payFine(odunc_id, ceza); // Eski endpoint (Direkt ödeme)
+                    Swal.fire('Başarılı', 'Karttan çekildi ve iade alındı.', 'success');
+                    refreshPage();
+                } catch (err) { Swal.fire('Hata', err.message, 'error'); }
+            }
+        });
+    };
 };
 
 export const loansModule = {

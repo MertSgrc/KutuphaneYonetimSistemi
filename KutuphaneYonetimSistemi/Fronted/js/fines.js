@@ -6,20 +6,32 @@ export const finesModule = {
         container.innerHTML = '<h1>Gecikmiş Kitaplar ve Cezalar</h1><p>Yükleniyor...</p>';
 
         try {
-            // 1. Tüm ödünçleri çek
-            const loans = await api.getLoans(); 
+            // 1. Verileri Çek (Ödünçler, Üyeler ve Kitaplar)
+            // İsimleri bulabilmek için hepsine ihtiyacımız var.
+            const [loans, members, books] = await Promise.all([
+                api.getLoans(),
+                api.getMembers(),
+                api.getBooks()
+            ]);
 
             // 2. Gecikenleri Filtrele
             const today = new Date();
             today.setHours(0, 0, 0, 0); 
 
             const overdueLoans = loans.filter(loan => {
-                // Tarih formatını kontrol et ve çevir
-                const tarihString = loan.odunc_iade_tarihi || loan.iade_tarihi;
+                // Java Model (Odunc.java): @JsonProperty("iade_tarihi") -> iade_tarihi
+                const tarihString = loan.iade_tarihi;
+                
+                if(!tarihString) return false;
+                
                 const iadeTarihi = new Date(tarihString);
 
-                // Kural: Kitap hala üyedeyse (odunc_durum: true) VE tarihi geçmişse
-                return loan.odunc_durum === true && iadeTarihi < today;
+                // Kural: Kitap hala üyedeyse (Java'da "durum" alanı) VE iade tarihi geçmişse
+                // Not: Backend silme mantığıyla çalışıyorsa listedeki her şey aktiftir.
+                // Yine de 'durum' alanını kontrol etmek güvenlidir.
+                const isActive = loan.durum !== 'İade Edildi' && loan.durum !== 'Pasif';
+                
+                return isActive && iadeTarihi < today;
             });
 
             if (overdueLoans.length === 0) {
@@ -33,29 +45,38 @@ export const finesModule = {
 
             // 3. Tabloyu oluştur
             const rows = overdueLoans.map(loan => {
-                const tarihString = loan.odunc_iade_tarihi || loan.iade_tarihi;
+                // ID ve Tarihler (Odunc.java JsonProperty uyumlu)
+                const oId = loan.odunc_id;
+                const tarihString = loan.iade_tarihi;
                 const iadeTarihi = new Date(tarihString);
                 
-                // Gecikilen gün sayısını bul
+                // Ceza Hesabı
                 const diffTime = Math.abs(today - iadeTarihi);
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-                
-                // --- DEĞİŞİKLİK BURADA: Günlük Ceza 5 TL ---
-                const gunlukCeza = 5; 
-                const toplamCeza = diffDays * gunlukCeza;
-                // -------------------------------------------
+                const toplamCeza = diffDays * 5; // 5 TL/Gün
+
+                // İsimleri Eşleştirme (Mapping)
+                // Odunc.java: uye_id -> Uye.java: uye_id
+                const uId = loan.uye_id;
+                const member = members.find(m => m.uye_id === uId);
+                const memberName = member ? `${member.uye_ad} ${member.uye_soyad}` : `Üye ID: ${uId}`;
+
+                // Odunc.java: ktp_id -> Kitap.java: ktpId (Dikkat: Kitap modelinde camelCase)
+                const kId = loan.ktp_id; 
+                const book = books.find(b => b.ktpId === kId);
+                const bookName = book ? book.ktpAd : `Kitap ID: ${kId}`;
 
                 return `
                     <tr style="background-color: #fff3cd;">
-                        <td>${loan.odunc_id}</td>
-                        <td>${loan.uye_ad_soyad || loan.uye_ad + ' ' + loan.uye_soyad || 'Üye'}</td>
-                        <td>${loan.kitap_ad || 'Kitap'}</td>
+                        <td>${oId}</td>
+                        <td>${memberName}</td>
+                        <td>${bookName}</td>
                         <td>${tarihString}</td>
                         <td style="color:red; font-weight:bold;">${diffDays} Gün</td>
                         <td style="font-weight:bold;">${toplamCeza.toFixed(2)} TL</td>
                         <td>
                             <button class="btn btn-warning btn-pay-fine" 
-                                data-id="${loan.odunc_id}" 
+                                data-id="${oId}" 
                                 data-ceza="${toplamCeza.toFixed(2)}">
                                 <i class="fas fa-coins"></i> Öde & İade Al
                             </button>
@@ -81,6 +102,7 @@ export const finesModule = {
                 </div>
             `;
 
+            // loans.js içindeki dinleyicileri (Ödeme butonu vb.) buraya bağlıyoruz
             attachLoanListeners(container);
 
         } catch (error) {

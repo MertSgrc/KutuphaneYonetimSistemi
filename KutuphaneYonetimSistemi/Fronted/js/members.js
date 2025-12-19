@@ -18,25 +18,35 @@ const renderMemberForm = () => `
 
 // --- LİSTE HTML ---
 const renderMemberList = (members) => {
-    if (members.length === 0) return '<p class="alert info">Henüz kayıtlı üye bulunmamaktadır.</p>';
+    if (!members || members.length === 0) return '<p class="alert info">Henüz kayıtlı üye bulunmamaktadır.</p>';
 
-    const rows = members.map(uye => `
+    // DEĞİŞİKLİK BURADA: (uye, index) yapısı kullanıldı
+    const rows = members.map((uye, index) => {
+        const email = uye.uyeEmail || uye.uye_email || '-'; 
+
+        return `
         <tr>
-            <td>${uye.uye_id}</td>
-            <td>${uye.uye_ad} ${uye.uye_soyad}</td>
-            <td>${uye.uye_email}</td>
+            <td style="font-weight:bold;">${index + 1}</td> <td>${uye.uye_ad} ${uye.uye_soyad}</td>
+            <td>${email}</td>
             <td>${uye.uye_telefon || '-'}</td>
             <td>
                 <button class="btn btn-danger btn-delete-member" data-id="${uye.uye_id}">Sil</button>
             </td>
         </tr>
-    `).join('');
+    `}).join('');
 
     return `
         <div class="card">
             <h3>Kayıtlı Üyeler</h3>
             <table class="data-table">
-                <thead><tr><th>ID</th><th>Ad Soyad</th><th>E-posta</th><th>Telefon</th><th>İşlem</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">#</th> <th>Ad Soyad</th>
+                        <th>E-posta</th>
+                        <th>Telefon</th>
+                        <th>İşlem</th>
+                    </tr>
+                </thead>
                 <tbody>${rows}</tbody>
             </table>
         </div>
@@ -65,7 +75,8 @@ const attachFormListener = () => {
             const data = Object.fromEntries(formData.entries());
 
             try {
-                await api.addMember(data); // Yönetici ekliyor
+                await api.registerMember(data); 
+                
                 showToast('Üye başarıyla eklendi.', 'success'); 
                 form.reset();
                 fetchAndRenderMembers(document.getElementById('member-list-container'));
@@ -78,38 +89,32 @@ const attachFormListener = () => {
 
 const attachDeleteListener = (container) => {
     container.querySelectorAll('.btn-delete-member').forEach(btn => {
-        // Not: Buradaki 'async' kelimesini kaldırdık, aşağıya taşıdık
         btn.addEventListener('click', (e) => { 
             const memberId = parseInt(e.target.dataset.id);
 
-            // Eski confirm yerine kırmızı butonlu uyarı
             Swal.fire({
                 title: 'Emin misiniz?',
                 text: "Bu üyeyi silmek istediğinize emin misiniz? Bu işlem geri alınamaz!",
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonColor: '#d33', // Silme butonu kırmızı
-                cancelButtonColor: '#3085d6', // İptal butonu mavi
+                confirmButtonColor: '#d33', 
+                cancelButtonColor: '#3085d6', 
                 confirmButtonText: 'Evet, Sil',
                 cancelButtonText: 'Vazgeç'
             }).then(async (result) => {
-                // Kullanıcı "Evet" derse burası çalışır
                 if (result.isConfirmed) {
                     try {
                         await api.deleteMember(memberId);
                         
-                        // Başarılı olursa büyük yeşil onay kutusu
                         Swal.fire(
                             'Silindi!',
                             'Üye başarıyla silindi.',
                             'success'
                         );
 
-                        // Listeyi yenile
                         fetchAndRenderMembers(document.getElementById('member-list-container'));
 
                     } catch (error) {
-                        // Hata olursa kırmızı hata kutusu
                         Swal.fire(
                             'Hata!',
                             error.message,

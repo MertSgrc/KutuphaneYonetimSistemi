@@ -1,0 +1,12 @@
+com\mert\kutuphane\repository\UyeRepository.class
+com\mert\kutuphane\repository\OduncRepository.class
+com\mert\kutuphane\repository\KitapRepository.class
+com\mert\kutuphane\model\Uye.class
+com\mert\kutuphane\model\Kitap.class
+com\mert\kutuphane\KutuphaneApplication.class
+com\mert\kutuphane\model\Odunc.class
+com\mert\kutuphane\repository\KategoriRepository.class
+com\mert\kutuphane\repository\PersonelRepository.class
+com\mert\kutuphane\model\Personel.class
+com\mert\kutuphane\controller\LibraryController.class
+com\mert\kutuphane\model\Kategori.class

@@ -14,35 +14,61 @@ export const reportsModule = {
 
             // --- 1. HESAPLAMALAR ---
 
-            // A) Finansal Durum (Toplam Tahsil Edilen Ceza)
-            const totalRevenue = loans.reduce((sum, loan) => sum + (loan.ceza_odenen || 0), 0);
+            // A) Aktif ve Tamamlanan İşlemler
+            const activeLoansList = loans.filter(l => l.durum === "Aktif");
+            const completedLoansList = loans.filter(l => l.durum === "İade Edildi" || l.durum === "Pasif");
             
-            // B) Aktif ve Tamamlanan İşlemler
-            const activeLoans = loans.filter(l => l.odunc_durum).length;
-            const completedLoans = loans.filter(l => !l.odunc_durum).length;
+            const activeCount = activeLoansList.length;
+            const completedCount = completedLoansList.length;
+
+            // B) Finansal Durum (Toplam Tahsil Edilen Ceza)
+            // Mantık: İade edilmiş VE 'odeme_yapildi' true olanları bulup cezayı hesaplıyoruz.
+            let totalRevenue = 0;
+            
+            completedLoansList.forEach(loan => {
+                if (loan.odeme_yapildi === true) {
+                    // Cezayı hesapla (Geçmişe dönük)
+                    const alisTarihi = new Date(loan.odunc_tarihi);
+                    const iadeTarihi = new Date(loan.iade_tarihi);
+                    
+                    // Son Teslim Tarihi (Alış + 14 gün)
+                    const teslimTarihi = new Date(alisTarihi);
+                    teslimTarihi.setDate(teslimTarihi.getDate() + 14);
+
+                    // Eğer iade tarihi, teslim tarihinden sonraysa ceza vardır
+                    if (iadeTarihi > teslimTarihi) {
+                        const diffTime = Math.abs(iadeTarihi - teslimTarihi);
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        const cezaTutari = diffDays * 5.0; // Günlük 5 TL
+                        totalRevenue += cezaTutari;
+                    }
+                }
+            });
 
             // C) En Popüler Kitaplar (Top 5)
             const bookCounts = {};
             loans.forEach(l => {
-                bookCounts[l.kitap_id] = (bookCounts[l.kitap_id] || 0) + 1;
+                const kId = l.ktp_id; 
+                bookCounts[kId] = (bookCounts[kId] || 0) + 1;
             });
 
             const popularBooks = Object.entries(bookCounts)
                 .sort((a, b) => b[1] - a[1]) // Çoktan aza sırala
                 .slice(0, 5) // İlk 5'i al
                 .map(([id, count]) => {
-                    const book = books.find(b => b.kitap_id == id);
+                    const book = books.find(b => b.ktpId == id);
                     return { 
-                        name: book ? book.kitap_ad : 'Silinmiş Kitap', 
+                        name: book ? book.ktpAd : 'Silinmiş Kitap', 
                         count: count,
-                        percent: (count / loans.length) * 100 // Yüzdelik dilim
+                        percent: loans.length > 0 ? (count / loans.length) * 100 : 0
                     };
                 });
 
             // D) En Aktif Üyeler (Top 5)
             const memberCounts = {};
             loans.forEach(l => {
-                memberCounts[l.uye_id] = (memberCounts[l.uye_id] || 0) + 1;
+                const uId = l.uye_id;
+                memberCounts[uId] = (memberCounts[uId] || 0) + 1;
             });
 
             const topMembers = Object.entries(memberCounts)
@@ -59,7 +85,6 @@ export const reportsModule = {
 
             // --- 2. HTML OLUŞTURMA ---
 
-            // Popüler Kitaplar Listesi HTML
             const booksHtml = popularBooks.map(item => `
                 <div style="margin-bottom: 15px;">
                     <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
@@ -72,7 +97,6 @@ export const reportsModule = {
                 </div>
             `).join('');
 
-            // En İyi Üyeler Tablosu HTML
             const membersHtml = topMembers.map((item, index) => `
                 <tr>
                     <td>${index + 1}.</td>
@@ -80,7 +104,6 @@ export const reportsModule = {
                     <td style="text-align:right;"><strong>${item.count}</strong> Kitap</td>
                 </tr>
             `).join('');
-
 
             const content = `
                 <h1>Yönetici Raporları</h1>
@@ -94,16 +117,16 @@ export const reportsModule = {
                     <div class="stat-card" style="border-left: 5px solid #17a2b8; background:#d1ecf1;">
                         <h3 style="color:#17a2b8;">Toplam İşlem</h3>
                         <p style="font-size:1.8em; font-weight:bold;">${loans.length}</p>
-                        <small>Bugüne kadar yapılan ödünç</small>
+                        <small>Geçmiş ve şu anki tüm kayıtlar</small>
                     </div>
                     <div class="stat-card" style="border-left: 5px solid #ffc107; background:#fff3cd;">
                         <h3 style="color:#856404;">Aktif Ödünç</h3>
-                        <p style="font-size:1.8em; font-weight:bold;">${activeLoans}</p>
+                        <p style="font-size:1.8em; font-weight:bold;">${activeCount}</p>
                         <small>Şu an üyelerde olan kitaplar</small>
                     </div>
                     <div class="stat-card" style="border-left: 5px solid #6c757d; background:#e2e3e5;">
                         <h3 style="color:#383d41;">İade Edilen</h3>
-                        <p style="font-size:1.8em; font-weight:bold;">${completedLoans}</p>
+                        <p style="font-size:1.8em; font-weight:bold;">${completedCount}</p>
                         <small>Başarıyla tamamlanan</small>
                     </div>
                 </div>

@@ -27,7 +27,10 @@ const updateSidebarVisibility = () => {
     const user = auth.getUser();
     if (!user) return;
 
-    const role = user.yetki; // 'Yonetici', 'Personel' veya 'Uye'
+    // auth.js login fonksiyonunda 'yetki' veya 'roleType' ayarlanıyor.
+    // Personel.java'dan gelen yetki: 'Yonetici' veya 'Personel'
+    // Uye girişi yapılırsa auth.js 'Uye' olarak set ediyor.
+    const role = user.yetki || 'Uye'; 
     
     // Rol ismini logoya yazalım (varsa)
     const roleDisplay = document.getElementById('user-role-display');
@@ -40,7 +43,7 @@ const updateSidebarVisibility = () => {
         // Yönetici hepsini görür
         document.querySelectorAll('.role-admin, .role-staff').forEach(el => el.style.display = 'flex');
     } else if (role === 'Personel') {
-        // Personel sadece staff class'lı olanları görür
+        // Personel sadece staff class'lı olanları görür (Admin hariç)
         document.querySelectorAll('.role-staff').forEach(el => el.style.display = 'flex');
     } 
     // Üye ise hiçbirini görmez, sadece genel linkler kalır.
@@ -51,7 +54,7 @@ const renderHomePage = async () => {
     const user = auth.getUser();
     
     // 1. Üye Girişi İse: Basit Karşılama Ekranı
-    if (user.yetki === 'Uye') {
+    if (user.roleType === 'member' || user.yetki === 'Uye') {
         renderDefaultPage("Hoş Geldiniz", `
             <div style="text-align: center; padding: 20px;">
                 <h2 style="color: var(--accent-color);">Merhaba, ${user.ad}!</h2>
@@ -75,8 +78,12 @@ const renderHomePage = async () => {
             api.getBooks()
         ]);
 
-        const activeLoans = loans.filter(o => o.odunc_durum).length;
-        const overdueLoans = loans.filter(o => o.odunc_durum && o.ceza > 0).length;
+        // Backend mantığı gereği 'Odunc' tablosundaki kayıtlar silinmediği sürece aktiftir.
+        // İade işlemi kaydı sildiği için, loans.length direkt aktif sayısını verir.
+        const activeLoans = loans.length; 
+        
+        // Ceza, api.getLoans() içinde hesaplanıp objeye ekleniyor.
+        const overdueLoans = loans.filter(o => o.ceza > 0).length;
 
         const content = `
             <p style="margin-bottom: 20px;">Yönetim paneline hoş geldiniz. İşte güncel durum:</p>
@@ -131,7 +138,8 @@ export const router = {
 
         // Yetki Kontrolü (Üyeler yasaklı sayfalara giremesin)
         const user = auth.getUser();
-            if (user.yetki === 'Uye' && ['members', 'loans', 'fines', 'categories', 'staff', 'reports'].includes(route)) {
+        // auth.js 'roleType' : 'member' veya 'staff' olarak dönüyor
+        if ((user.roleType === 'member' || user.yetki === 'Uye') && ['members', 'loans', 'fines', 'categories', 'staff', 'reports'].includes(route)) {
             renderDefaultPage("Yetkisiz Erişim", `<p class="alert error">Bu sayfayı görüntüleme yetkiniz yok.</p>`);
             return;
         }
