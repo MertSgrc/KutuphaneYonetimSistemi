@@ -7,7 +7,6 @@ export const finesModule = {
 
         try {
             // 1. Verileri Çek (Ödünçler, Üyeler ve Kitaplar)
-            // İsimleri bulabilmek için hepsine ihtiyacımız var.
             const [loans, members, books] = await Promise.all([
                 api.getLoans(),
                 api.getMembers(),
@@ -19,16 +18,11 @@ export const finesModule = {
             today.setHours(0, 0, 0, 0); 
 
             const overdueLoans = loans.filter(loan => {
-                // Java Model (Odunc.java): @JsonProperty("iade_tarihi") -> iade_tarihi
                 const tarihString = loan.iade_tarihi;
                 
                 if(!tarihString) return false;
                 
                 const iadeTarihi = new Date(tarihString);
-
-                // Kural: Kitap hala üyedeyse (Java'da "durum" alanı) VE iade tarihi geçmişse
-                // Not: Backend silme mantığıyla çalışıyorsa listedeki her şey aktiftir.
-                // Yine de 'durum' alanını kontrol etmek güvenlidir.
                 const isActive = loan.durum !== 'İade Edildi' && loan.durum !== 'Pasif';
                 
                 return isActive && iadeTarihi < today;
@@ -45,7 +39,6 @@ export const finesModule = {
 
             // 3. Tabloyu oluştur
             const rows = overdueLoans.map(loan => {
-                // ID ve Tarihler (Odunc.java JsonProperty uyumlu)
                 const oId = loan.odunc_id;
                 const tarihString = loan.iade_tarihi;
                 const iadeTarihi = new Date(tarihString);
@@ -56,12 +49,10 @@ export const finesModule = {
                 const toplamCeza = diffDays * 5; // 5 TL/Gün
 
                 // İsimleri Eşleştirme (Mapping)
-                // Odunc.java: uye_id -> Uye.java: uye_id
                 const uId = loan.uye_id;
                 const member = members.find(m => m.uye_id === uId);
                 const memberName = member ? `${member.uye_ad} ${member.uye_soyad}` : `Üye ID: ${uId}`;
 
-                // Odunc.java: ktp_id -> Kitap.java: ktpId (Dikkat: Kitap modelinde camelCase)
                 const kId = loan.ktp_id; 
                 const book = books.find(b => b.ktpId === kId);
                 const bookName = book ? book.ktpAd : `Kitap ID: ${kId}`;
@@ -102,7 +93,6 @@ export const finesModule = {
                 </div>
             `;
 
-            // loans.js içindeki dinleyicileri (Ödeme butonu vb.) buraya bağlıyoruz
             attachLoanListeners(container);
 
         } catch (error) {

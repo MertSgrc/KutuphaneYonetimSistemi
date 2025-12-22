@@ -10,7 +10,7 @@ export const categoriesModule = {
             // SIRA NUMARASI EKLEME (index + 1)
             const categoryRows = categories.map((cat, index) => {
                 const name = cat.kategoriAd || 'İsimsiz'; 
-                const id = cat.kategoriId; // Silme işlemi için gerçek ID lazım
+                const id = cat.kategoriId; 
 
                 return `
                 <tr>

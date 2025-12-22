@@ -20,7 +20,6 @@ const renderMemberForm = () => `
 const renderMemberList = (members) => {
     if (!members || members.length === 0) return '<p class="alert info">Henüz kayıtlı üye bulunmamaktadır.</p>';
 
-    // DEĞİŞİKLİK BURADA: (uye, index) yapısı kullanıldı
     const rows = members.map((uye, index) => {
         const email = uye.uyeEmail || uye.uye_email || '-'; 
 

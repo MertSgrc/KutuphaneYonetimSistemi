@@ -17,7 +17,7 @@ public class Personel {
     private String personel_soyad;
     
     @Column(name = "kullanici_adi")
-    private String kullaniciAdi; // Java'da camelCase, DB'de snake_case
+    private String kullaniciAdi; 
     
     private String sifre;
     private String yetki;

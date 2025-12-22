@@ -40,7 +40,7 @@ public class LibraryController {
         String identifier = creds.get("username");
         String password = creds.get("password");
 
-        // Personel Kontrolü (Değişmedi)
+        // Personel Kontrolü 
         List<Personel> personeller = personelRepo.findAll();
         for(Personel p : personeller) {
             if(p.getKullaniciAdi().equals(identifier) && p.getSifre().equals(password)) {
@@ -53,11 +53,11 @@ public class LibraryController {
             }
         }
 
-        // Üye Kontrolü (Aktiflik Kontrolü Eklendi)
+       
         List<Uye> uyeler = uyeRepo.findAll();
         for(Uye u : uyeler) {
             if(u.getUyeEmail() != null && u.getUyeEmail().equals(identifier) && u.getSifre().equals(password)) {
-                // Eğer hesap doğrulanmamışsa hata ver
+    
                 if (!u.isAktif()) {
                     return ResponseEntity.status(403).body("Hesabınız doğrulanmamış! Lütfen mailinize gelen kodu giriniz.");
                 }
@@ -72,7 +72,7 @@ public class LibraryController {
         return ResponseEntity.status(401).body("Hatalı kullanıcı adı veya şifre");
     }
 
-    // --- 3. ÜYE İŞLEMLERİ (GÜNCELLENDİ: Mail Gönderme) ---
+    // --- ÜYE İŞLEMLERİ  ---
     @GetMapping("/members")
     public List<Uye> getAllMembers() { return uyeRepo.findAll(); }
 
@@ -106,7 +106,7 @@ public class LibraryController {
         }
     }
     
-    // --- YENİ: DOĞRULAMA ENDPOINT'İ ---
+    
     @PostMapping("/verify")
     public ResponseEntity<?> verifyAccount(@RequestBody Map<String, String> payload) {
         String email = payload.get("email");
@@ -115,12 +115,11 @@ public class LibraryController {
         List<Uye> uyeler = uyeRepo.findAll();
         for(Uye u : uyeler) {
             if(u.getUyeEmail() != null && u.getUyeEmail().equals(email)) {
-                // Kod kontrolü (Null check eklendi)
+               
                 if(u.getDogrulamaKodu() != null && u.getDogrulamaKodu().equals(code)) {
-                    u.setAktif(true); // Hesabı aktifleştir
+                    u.setAktif(true); 
                     uyeRepo.save(u);
                     
-                    // KRİTİK DÜZELTME: Cevabı JSON formatında dönüyoruz
                     return ResponseEntity.ok(Collections.singletonMap("message", "Doğrulama başarılı! Giriş yapabilirsiniz."));
                 } else {
                     return ResponseEntity.badRequest().body("Hatalı doğrulama kodu!");
@@ -216,8 +215,7 @@ public class LibraryController {
             
             // Durum güncelle ve ÖDEME YAPILDI işaretle
             odunc.setDurum("İade Edildi");
-            odunc.setOdemeYapildi(true); // <--- İşte sihirli değnek burası
-            
+            odunc.setOdemeYapildi(true);           
             oduncRepo.save(odunc);
            return ResponseEntity.ok(Collections.singletonMap("message", "Ödeme alındı ve iade edildi."));
         }
@@ -228,7 +226,7 @@ public class LibraryController {
     @PostMapping("/staff") public Personel addStaff(@RequestBody Personel p) { return personelRepo.save(p); }
     @DeleteMapping("/staff/{id}") public void deleteStaff(@PathVariable int id) { personelRepo.deleteById(id); }
 
-    // --- YENİ: BAKİYE YÜKLEME ---
+    // --- BAKİYE YÜKLEME ---
     @PostMapping("/members/{id}/deposit")
     public ResponseEntity<?> depositMoney(@PathVariable int id, @RequestBody Map<String, Double> payload) {
         Double amount = payload.get("amount");
@@ -246,7 +244,7 @@ public class LibraryController {
         return ResponseEntity.badRequest().body(Collections.singletonMap("error", "Üye bulunamadı"));
     }
 
-    // --- YENİ: CÜZDANDAN CEZA ÖDEYEREK İADE ---
+    // --- CÜZDANDAN CEZA ÖDEYEREK İADE ---
     @PostMapping("/loans/{id}/pay-wallet")
     public ResponseEntity<?> payFineFromWallet(@PathVariable int id, @RequestBody Map<String, Double> payload) {
         Double cezaTutari = payload.get("amount");

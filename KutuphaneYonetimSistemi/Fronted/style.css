@@ -1,12 +1,12 @@
 :root {
-    --primary-color: #34495e; /* Koyu Gri Mavi */
-    --accent-color: #1abc9c; /* Turkuaz (Vurgu) */
-    --secondary-color: #2c3e50; /* Daha Koyu Sidebar Rengi */
+    --primary-color: #34495e; 
+    --accent-color: #1abc9c; 
+    --secondary-color: #2c3e50;
     --background-color: #ecf0f1;
-    --danger-color: #e74c3c; /* Kırmızı (Silme/Ceza) */
-    --warning-color: #f39c12; /* Turuncu (Stok Az) */
-    --success-color: #2ecc71; /* Yeşil (Ekleme/Başarı) */
-    --info-color: #3498db; /* Mavi (Bilgi/Güncelleme) */
+    --danger-color: #e74c3c; 
+    --warning-color: #f39c12; 
+    --success-color: #2ecc71; 
+    --info-color: #3498db; 
 }
 
 * {
@@ -16,24 +16,25 @@
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
+h1{
+    color: #1abc9c;
+}
+
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     margin: 0;
     padding: 0;
-    background-color: #f4f6f9; /* Panel için gri arka plan */
-    /* display: flex;  <-- BU SATIRLARI SİLDİK */
-    /* justify-content: center; */
-    /* align-items: center; */
+    background-color: #f4f6f9;
     height: 100vh;
 }
 
-/* 2. Sadece Giriş Ekranı İçin Özel Body Stili (YENİ EKLE) */
+/* 2. Sadece Giriş Ekranı İçin Özel Body Stili */
 body.login-mode {
    background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('https://upload.wikimedia.org/wikipedia/commons/e/e1/Duke_Humfrey%27s_Library_Interior_6%2C_Bodleian_Library%2C_Oxford%2C_UK_-_Diliff.jpg');
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
-    display: flex; /* Sadece girişte ortala */
+    display: flex;
     justify-content: center;
     align-items: center;
 }
@@ -46,19 +47,19 @@ body.login-mode {
 }
 
 .login-form {
-    background: rgba(255, 255, 255, 0.15); /* Beyaz ama çok şeffaf */
-    backdrop-filter: blur(10px); /* Arkayı bulanıklaştırır (Buzlu cam) */
-    -webkit-backdrop-filter: blur(10px); /* Safari için */
-    border: 1px solid rgba(255, 255, 255, 0.2); /* İnce cam kenarlığı */
+    background: rgba(255, 255, 255, 0.15); 
+    backdrop-filter: blur(10px); 
+    -webkit-backdrop-filter: blur(10px); 
+    border: 1px solid rgba(255, 255, 255, 0.2); 
     padding: 40px;
     border-radius: 15px;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); /* Derinlik gölgesi */
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); 
     text-align: center;
-    color: white; /* Yazılar beyaz olsun ki koyu arka planda okunsun */
+    color: white; 
     transition: transform 0.3s ease;
 }
 .login-form:hover {
-    transform: translateY(-5px); /* Üzerine gelince hafif yukarı kalksın */
+    transform: translateY(-5px); 
 }
 
 .login-form h1 {
@@ -74,10 +75,9 @@ body.login-mode {
     padding: 12px;
     margin-bottom: 15px;
     border: none;
-    border-radius: 25px; /* Yuvarlak hatlar */
-    background: rgba(255, 255, 255, 0.9); /* Inputlar net görünsün */
-    font-size: 16px;
-    box-sizing: border-box; /* Padding taşmasını önler */
+    border-radius: 25px; 
+    background: rgba(255, 255, 255, 0.9); 
+    box-sizing: border-box; 
     outline: none;
     transition: 0.3s;
 }
@@ -99,7 +99,7 @@ body.login-mode {
 }
 
 .btn-primary {
-    background: #e74c3c; /* Kırmızımsı ton (Kitap kırmızısı) */
+    background: #e74c3c; 
     color: white;
 }
 
@@ -134,7 +134,7 @@ body.login-mode {
     display: flex;
 }
 
-/* Sidebar */
+
 .sidebar {
     width: 250px;
     height: 100vh;
@@ -164,7 +164,7 @@ body.login-mode {
     padding: 15px 20px;
     display: flex;
     align-items: center;
-    gap: 10px; /* İkon ile yazı arasına boşluk */
+    gap: 10px; 
     transition: background-color 0.2s, color 0.2s;
     font-size: 1em;
 }
@@ -191,7 +191,6 @@ body.login-mode {
     padding-bottom: 10px;
 }
 
-/* Genel Form ve Input Stilleri */
 input[type="text"],
 input[type="email"],
 input[type="password"],
@@ -217,7 +216,7 @@ input:focus, select:focus {
     margin-bottom: 15px;
 }
 
-/* Buton Stilleri */
+
 .btn {
     padding: 10px 15px;
     border: none;
@@ -335,8 +334,7 @@ input:focus, select:focus {
     font-weight: 700;
 }
 
-/* Uyarı ve Mesaj Stilleri */
-/* Bildirim Kutusu (Alert Yerine) */
+
 #notification-area {
     position: fixed;
     top: 20px;
@@ -370,7 +368,7 @@ input:focus, select:focus {
     to { opacity: 0; visibility: hidden; }
 }
 
-/* Özel Durumlar */
+
 .loan-status-fine {
     color: var(--danger-color);
     font-weight: 600;
@@ -399,7 +397,7 @@ input:focus, select:focus {
     padding: 10px 0;
 }
 
-/* Kitap Kartı */
+
 .book-card {
     background: white;
     border-radius: 10px;
@@ -415,7 +413,7 @@ input:focus, select:focus {
     box-shadow: 0 10px 20px rgba(0,0,0,0.15);
 }
 
-/* Kapak Resmi */
+
 .book-image {
     height: 250px;
     background-size: cover;
@@ -424,7 +422,7 @@ input:focus, select:focus {
     border-bottom: 1px solid #eee;
 }
 
-/* Kart İçeriği */
+
 .book-info {
     padding: 15px;
     flex-grow: 1;
@@ -455,7 +453,7 @@ input:focus, select:focus {
 }
 
 .book-footer {
-    margin-top: auto; /* En alta it */
+    margin-top: auto; 
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -474,12 +472,12 @@ input:focus, select:focus {
 
 .modal {
     position: fixed;
-    z-index: 2000; /* En üstte */
+    z-index: 2000; 
     left: 0;
     top: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5); /* Yarı saydam siyah arka plan */
+    background-color: rgba(0, 0, 0, 0.5);
     display: flex;
     justify-content: center;
     align-items: center;

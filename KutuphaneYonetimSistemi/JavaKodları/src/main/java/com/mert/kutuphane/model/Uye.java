@@ -7,15 +7,14 @@ import java.time.LocalDate;
 @Entity @Table(name = "uyeler") @Data
 public class Uye {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private int uye_id; // Primary key'i olduğu gibi bıraktık
+    private int uye_id; 
     
     private String uye_ad;
     private String uye_soyad;
     private String uye_telefon;
     
     @Column(name = "uye_email") 
-    private String uyeEmail; // Java'da camelCase, DB'de snake_case
-    
+    private String uyeEmail;  
     @Column(name = "uye_kayıt_tarihi")
     private LocalDate uyeKayitTarihi;
     

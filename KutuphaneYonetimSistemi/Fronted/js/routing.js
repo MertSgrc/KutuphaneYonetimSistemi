@@ -27,9 +27,6 @@ const updateSidebarVisibility = () => {
     const user = auth.getUser();
     if (!user) return;
 
-    // auth.js login fonksiyonunda 'yetki' veya 'roleType' ayarlanıyor.
-    // Personel.java'dan gelen yetki: 'Yonetici' veya 'Personel'
-    // Uye girişi yapılırsa auth.js 'Uye' olarak set ediyor.
     const role = user.yetki || 'Uye'; 
     
     // Rol ismini logoya yazalım (varsa)
@@ -71,18 +68,12 @@ const renderHomePage = async () => {
 
     // 2. Personel veya Yönetici İse: İstatistik Paneli (Dashboard)
     try {
-        // Verileri çek
         const [loans, members, books] = await Promise.all([
             api.getLoans(),
             api.getMembers(),
             api.getBooks()
         ]);
-
-        // Backend mantığı gereği 'Odunc' tablosundaki kayıtlar silinmediği sürece aktiftir.
-        // İade işlemi kaydı sildiği için, loans.length direkt aktif sayısını verir.
         const activeLoans = loans.length; 
-        
-        // Ceza, api.getLoans() içinde hesaplanıp objeye ekleniyor.
         const overdueLoans = loans.filter(o => o.ceza > 0).length;
 
         const content = `
@@ -138,7 +129,6 @@ export const router = {
 
         // Yetki Kontrolü (Üyeler yasaklı sayfalara giremesin)
         const user = auth.getUser();
-        // auth.js 'roleType' : 'member' veya 'staff' olarak dönüyor
         if ((user.roleType === 'member' || user.yetki === 'Uye') && ['members', 'loans', 'fines', 'categories', 'staff', 'reports'].includes(route)) {
             renderDefaultPage("Yetkisiz Erişim", `<p class="alert error">Bu sayfayı görüntüleme yetkiniz yok.</p>`);
             return;

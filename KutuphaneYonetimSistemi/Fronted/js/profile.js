@@ -11,16 +11,10 @@ export const profileModule = {
         // --- 1. YÖNETİCİ veya PERSONEL İSE ---
         if (user.roleType === 'staff' || user.yetki === 'Yonetici' || user.yetki === 'Personel') {
             try {
-                // İsmini ve Soyismini tam bulmak için personel listesini çekelim
                 const staffList = await api.getStaff();
-                // Giriş yapan id ile listedeki id'yi eşleştirelim
                 const me = staffList.find(p => p.personel_id === (user.id || user.personel_id));
-                
-                // Eğer listede bulamazsa session'daki adı kullanır
                 const adSoyad = me ? `${me.personel_ad} ${me.personel_soyad}` : user.ad;
                 const unvan = me ? me.yetki : (user.yetki || 'Personel');
-                
-                // Ünvanı güzelleştirelim
                 const displayUnvan = unvan === 'Yonetici' ? 'Sistem Yöneticisi (Admin)' : 'Kütüphane Görevlisi';
 
                 container.innerHTML = `
@@ -37,15 +31,11 @@ export const profileModule = {
                         </p>
                     </div>
                 `;
-                return; // Yöneticiysen aşağıya inme, işlem bitti.
-
-            } catch (err) {
-                console.error("Personel bilgisi alınamadı", err);
-            }
+                return; 
+            } catch (err) { console.error("Personel bilgisi alınamadı", err); }
         }
 
-        // --- 2. EĞER ÜYE İSE (Aşağıdaki kodlar eskisi gibi çalışır) ---
-        
+        // --- 2. EĞER ÜYE İSE ---
         let currentUserData = user;
         try {
             const members = await api.getMembers();
@@ -166,7 +156,50 @@ export const profileModule = {
     }
 };
 
-// --- OLAY DİNLEYİCİLERİ (ÜYELER İÇİN) ---
+// --- YARDIMCI: KART MODALI AÇMA (GÜVENLİ) ---
+const openCreditCardModal = (odunc_id, ceza, container) => {
+    Swal.fire({
+        title: 'Güvenli Ödeme (Kart)',
+        html: `
+            <div style="text-align:left;">
+                <p>Tutar: <strong>${ceza.toFixed(2)} TL</strong></p>
+                <label>Kart Numarası</label>
+                <input id="cc-num-pay" class="swal2-input" placeholder="0000 0000 0000 0000" maxlength="19" autocomplete="off" name="rnd_cc_${Math.random()}">
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <div style="flex:1"><label>SKT</label><input id="cc-exp-pay" class="swal2-input" placeholder="AA/YY" maxlength="5" autocomplete="off"></div>
+                    <div style="flex:1"><label>CVC</label><input id="cc-cvc-pay" class="swal2-input" placeholder="123" maxlength="3" autocomplete="off"></div>
+                </div>
+            </div>
+        `,
+        confirmButtonText: 'Öde',
+        showCancelButton: true,
+        didOpen: () => {
+            // Maskeleme
+            const n = Swal.getPopup().querySelector('#cc-num-pay');
+            const e = Swal.getPopup().querySelector('#cc-exp-pay');
+            n.addEventListener('input', ev => {
+                let v=ev.target.value.replace(/\D/g,''), f='';
+                for(let i=0;i<v.length;i++){if(i>0&&i%4===0)f+=' ';f+=v[i]}
+                ev.target.value=f;
+            });
+            e.addEventListener('input', ev => {
+                let v=ev.target.value.replace(/\D/g,'').substring(0,4);
+                ev.target.value = v.length>=3 ? v.substring(0,2)+'/'+v.substring(2) : v;
+            });
+        },
+        preConfirm: () => { if(document.getElementById('cc-num-pay').value.length < 16) Swal.showValidationMessage('Kart no eksik'); }
+    }).then(async (payRes) => {
+        if (payRes.isConfirmed) {
+            try {
+                await api.payFine(odunc_id, ceza);
+                Swal.fire('Başarılı', 'Karttan ödendi ve iade alındı.', 'success');
+                profileModule.loadPage(container);
+            } catch (err) { Swal.fire('Hata', err.message, 'error'); }
+        }
+    });
+};
+
+// --- OLAY DİNLEYİCİLERİ ---
 const attachProfileListeners = (container, userId, currentBalance) => {
     
     // 1. PARA YÜKLEME
@@ -181,13 +214,15 @@ const attachProfileListeners = (container, userId, currentBalance) => {
         }).then((res) => {
             if (res.isConfirmed && res.value > 0) {
                 const amount = res.value;
+                
+                // BAKİYE YÜKLEME KART EKRANI
                 Swal.fire({
                     title: 'Güvenli Ödeme',
                     html: `
                         <div style="text-align:left;">
                             <p>Yüklenecek Tutar: <strong>${amount} TL</strong></p>
                             <label>Kart Numarası</label>
-                            <input id="cc-num" class="swal2-input" placeholder="0000 0000 0000 0000" maxlength="19" autocomplete="off" name="rnd_${Math.random()}">
+                            <input id="cc-num" class="swal2-input" placeholder="0000 0000 0000 0000" maxlength="19" autocomplete="off" name="dep_cc_${Math.random()}">
                             <div style="display:flex; gap:10px; margin-top:10px;">
                                 <div style="flex:1"><label>SKT</label><input id="cc-exp" class="swal2-input" placeholder="AA/YY" maxlength="5" autocomplete="off"></div>
                                 <div style="flex:1"><label>CVC</label><input id="cc-cvc" class="swal2-input" placeholder="123" maxlength="3" autocomplete="off"></div>
@@ -236,7 +271,7 @@ const attachProfileListeners = (container, userId, currentBalance) => {
         });
     });
 
-    // 3. BORÇ ÖDE
+    // 3. BORÇ ÖDE (BU KISIM DÜZELTİLDİ!)
     container.querySelectorAll('.btn-pay-action').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const id = e.target.closest('button').dataset.id;
@@ -255,8 +290,8 @@ const attachProfileListeners = (container, userId, currentBalance) => {
                     try { await api.payFineWallet(id, ceza); Swal.fire('Başarılı', 'Cüzdandan ödendi.', 'success'); profileModule.loadPage(container); }
                     catch(err) { Swal.fire('Hata', err.message, 'error'); }
                 } else if (res.isDenied) {
-                    try { await api.payFine(id, ceza); Swal.fire('Başarılı', 'Karttan ödendi.', 'success'); profileModule.loadPage(container); }
-                    catch(err) { Swal.fire('Hata', err.message, 'error'); }
+                    // DÜZELTME: Direkt ödeme yerine modal açılıyor
+                    openCreditCardModal(id, ceza, container);
                 }
             });
         });

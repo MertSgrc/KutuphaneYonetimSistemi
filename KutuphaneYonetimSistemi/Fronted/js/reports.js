@@ -53,8 +53,8 @@ export const reportsModule = {
             });
 
             const popularBooks = Object.entries(bookCounts)
-                .sort((a, b) => b[1] - a[1]) // Çoktan aza sırala
-                .slice(0, 5) // İlk 5'i al
+                .sort((a, b) => b[1] - a[1]) 
+                .slice(0, 5) 
                 .map(([id, count]) => {
                     const book = books.find(b => b.ktpId == id);
                     return { 

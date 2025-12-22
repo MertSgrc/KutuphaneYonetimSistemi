@@ -1,12 +1,10 @@
 import { api } from './api.js';
 import { auth } from './auth.js';
 import { showToast } from './app.js';
-// router kullanılmıyorsa import etmeye gerek yok ama yapını bozmamak için bırakıyorum
 import { router } from './routing.js';
 
 // --- YÖNETİCİ/PERSONEL İÇİN FORM ---
 const renderBookForm = (categories) => {
-    // Java Model: kategoriId ve kategoriAd
     const categoryOptions = categories.map(c => `<option value="${c.kategoriId}">${c.kategoriAd}</option>`).join('');
     
     return `
@@ -46,13 +44,11 @@ const renderBookForm = (categories) => {
 const renderAdminTable = (books, categories) => {
     if (!books || books.length === 0) return '<p class="alert info">Henüz kitap bulunmamaktadır.</p>';
     
-    // Java Model Uyumu: c.kategoriId
     const getCategoryName = (id) => categories.find(c => c.kategoriId === id)?.kategoriAd || 'Bilinmeyen';
     
     const rows = books.map(kitap => {
-        // Java Model Uyumu: ktpStok, kitapResim, ktpAd, yazar, kategoriId, ktpId
         let stockClass = kitap.ktpStok === 0 ? 'stock-out' : 'loan-status-ok';
-        // Resim yoksa varsayılan bir ikon gösterelim
+        // Resim yoksa varsayılan bir ikon göster
         let resimHtml = kitap.kitapResim 
             ? `<img src="${kitap.kitapResim}" alt="Kapak" style="height: 50px; width:auto;">`
             : `<i class="fas fa-book" style="font-size:24px; color:#ccc;"></i>`;
@@ -87,11 +83,9 @@ const renderAdminTable = (books, categories) => {
 // --- ÜYELER İÇİN KATALOG GÖRÜNÜMÜ ---
 const renderMemberCatalog = (books, categories) => {
     if (!books || books.length === 0) return '<p class="alert info">Kütüphanemizde henüz kitap bulunmamaktadır.</p>';
-    // Java Model Uyumu: c.kategoriId
     const getCategoryName = (id) => categories.find(c => c.kategoriId === id)?.kategoriAd || 'Genel';
 
     const cards = books.map(kitap => {
-        // Java Model Uyumu: ktpStok, kitapResim, ktpAd, yazar, kategoriId, ktpId
         const isOutOfStock = kitap.ktpStok <= 0;
         
         // Stok yoksa butonu pasif yap
@@ -133,7 +127,6 @@ const renderMemberCatalog = (books, categories) => {
 export const booksModule = {
     async loadPage(container) {
         const user = auth.getUser();
-        // Backend'den roleType: 'staff' veya 'member' geliyor
         const isAdminOrStaff = user.roleType === 'staff' || user.yetki === 'Yonetici' || user.yetki === 'Personel';
         
         container.innerHTML = `<h1>${isAdminOrStaff ? 'Kitap Yönetimi' : 'Kütüphane Kataloğu'}</h1><p>Yükleniyor...</p>`;
@@ -172,8 +165,6 @@ const attachAdminListeners = () => {
             e.preventDefault();
             const formData = new FormData(form);
             
-            // api.js'deki addBook fonksiyonu snake_case -> camelCase dönüşümü yapıyor
-            // o yüzden buradaki isimleri değiştirmemize gerek yok
             const kitap = {
                 kitap_ad: formData.get('kitap_ad'),
                 kitap_yazar: formData.get('kitap_yazar'),
@@ -266,7 +257,7 @@ const attachMemberListeners = () => {
             modal.classList.remove('hidden');
             // CSS transition için ufak bir gecikme ile show ekle
             setTimeout(() => modal.classList.add('show'), 10); 
-            modal.style.display = 'flex'; // CSS override gerekebilir
+            modal.style.display = 'flex';
         });
     });
 
@@ -283,7 +274,6 @@ const attachMemberListeners = () => {
 
     // 3. Form Submit (Onaylama)
     if (borrowForm) {
-        // Eski event listener'ları temizlemek için klonlama yöntemi veya onsubmit kullanımı
         borrowForm.onsubmit = async (e) => {
             e.preventDefault();
             const user = auth.getUser();
@@ -298,11 +288,8 @@ const attachMemberListeners = () => {
             }
 
             try {
-                // DÜZELTME: api.js'deki addLoan artık tek bir OBJE bekliyor.
-                // Eskiden: api.addLoan(user.id, kitapId, alis, iade) idi.
-                // Yeni hali:
                 await api.addLoan({
-                    uye_id: user.id || user.uye_id, // Hangisi varsa
+                    uye_id: user.id || user.uye_id, 
                     kitap_id: kitapId,
                     odunc_tarihi: alis,
                     iade_tarihi: iade

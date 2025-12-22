@@ -174,7 +174,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.sidebar a[data-route]').forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
-            // İkonun kendisine de tıklansa parent 'a' etiketini bul
             const route = e.target.closest('a').dataset.route; 
             router.navigate(route);
         });

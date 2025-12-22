@@ -26,8 +26,6 @@ const renderStaffList = (staff) => {
     const currentUser = auth.getUser();
 
     const rows = staff.map(p => {
-        // Java Model Uyumu: kullaniciAdi (camelCase)
-        // Backend 'kullaniciAdi' gönderir.
         const kAdi = p.kullaniciAdi || p.kullanici_adi; 
         
         return `
@@ -101,7 +99,6 @@ const attachFormListener = () => {
             e.preventDefault();
             const formData = new FormData(form);
             
-            // api.js addStaff fonksiyonu 'kullanici_adi' -> 'kullaniciAdi' dönüşümünü yapar.
             const data = Object.fromEntries(formData.entries());
 
             try {

@@ -7,13 +7,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Entity
 @Table(name = "odunc")
-@Data // Lombok ile Getter/Setter/ToString otomatik oluşturulur
+@Data 
 public class Odunc {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "odunc_id")
-    @JsonProperty("odunc_id") // Frontend'den gelen 'odunc_id'yi bu alana bağlar
+    @JsonProperty("odunc_id") 
     private int oduncId;
     
     @Column(name = "odunc_tarihi")
@@ -27,11 +27,11 @@ public class Odunc {
     private String durum;
     
     @Column(name = "uye_id")
-    @JsonProperty("uye_id") // Frontend'den gelen 'uye_id'yi bu alana bağlar
+    @JsonProperty("uye_id") 
     private int uyeId;
     
     @Column(name = "ktp_id")
-    @JsonProperty("ktp_id") // Frontend'den gelen 'ktp_id'yi bu alana bağlar
+    @JsonProperty("ktp_id") 
     private int ktpId;
 
     @Column(name = "odeme_yapildi")

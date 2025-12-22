@@ -1,8 +1,7 @@
 const API_BASE_URL = "http://localhost:8080/api";
 const FINE_PER_DAY = 5.0; // Günlük ceza miktarı
 
-// --- Yardımcı Fetch Fonksiyonu ---
-// (Senin gönderdiğin yapıyı aynen korudum, bu kısım harika çalışıyor)
+
 async function request(endpoint, method = 'GET', body = null) {
     const headers = {
         'Content-Type': 'application/json'
@@ -26,7 +25,6 @@ async function request(endpoint, method = 'GET', body = null) {
             throw new Error(`API Hatası (${response.status}): ${errorText}`);
         }
 
-        // DELETE işlemlerinde bazen içerik dönmez, hata yoksa true dönelim
         if (method === 'DELETE' && (response.status === 204 || response.status === 200)) {
             return true;
         }
@@ -35,38 +33,32 @@ async function request(endpoint, method = 'GET', body = null) {
         return await response.json();
     } catch (error) {
         console.error(`İstek Hatası (${endpoint}):`, error);
-        // Hatayı fırlatıyoruz ki auth.js veya app.js bunu yakalayıp ekrana basabilsin
         throw error;
     }
 }
 
 export const api = {
 
-    // --- GİRİŞ (LOGIN) ---
-    // NOT: Senin kodunda tüm listeyi çekip tarayıcıda kontrol ediyorduk.
-    // Ancak Java Controller'ımızda "/login" diye özel ve güvenli bir kapı var.
-    // Orayı kullanmak en doğrusu ve en hatasızıdır. Senin yapına uygun şekilde buraya entegre ettim.
+    
     login: async (identifier, password) => {
         try {
-            // Sunucuya "Benim adım bu, şifrem bu, kontrol et" diyoruz.
+            
             const response = await request('/login', 'POST', { 
                 username: identifier, 
                 password: password 
             });
             
-            // Eğer sunucu "Tamam" derse, dönen kullanıcı bilgilerini veriyoruz.
-            // Backend'den { id, ad, roleType... } gibi bir cevap döner.
+            
             return response;
 
         } catch (error) {
             console.error("Giriş başarısız:", error);
-            // Hata durumunda false dönüyoruz ki ekranda "Hatalı şifre" yazabilsin.
+            
             return false;
         }
     },
 
-    // --- KATEGORİ İŞLEMLERİ ---
-    // Controller Endpoint: /categories
+   
     getCategories: async () => {
         return await request('/categories');
     },
@@ -89,15 +81,13 @@ export const api = {
         return { success: true, message: "Kategori silindi." };
     },
 
-    // --- KİTAP İŞLEMLERİ ---
-    // Controller Endpoint: /books
+   
     getBooks: async () => {
         return await request('/books');
     },
 
     addBook: async (kitapData) => {
-        // Frontend formundan gelen verileri (snake_case), Java 'Kitap' modeline (camelCase) çeviriyoruz.
-        // Kitap.java: ktpAd, yazar, ktpStok, yayinYili...
+        
         const payload = {
             ktpAd: kitapData.kitap_ad || kitapData.ktpAd,
             yazar: kitapData.kitap_yazar || kitapData.yazar,
@@ -105,7 +95,6 @@ export const api = {
             yayinYili: kitapData.yayin_yili || null, // Tarih formatı: YYYY-MM-DD
             durum: "Aktif",
             kitapResim: kitapData.kitap_resim || "",
-            // İlişkisel kayıt için ID gönderiyoruz
             kategoriId: parseInt(kitapData.kategori_id)
         };
         return await request('/books', 'POST', payload);
@@ -117,16 +106,14 @@ export const api = {
     },
 
     // --- ÖDÜNÇ (LOAN) İŞLEMLERİ ---
-    // Controller Endpoint: /loans
     getLoans: async () => {
         const loans = await request('/loans');
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // Java'dan gelen veriye "ceza" bilgisini frontend tarafında hesaplayıp ekliyoruz
+        
         return loans.map(o => {
             let cezaMiktari = 0;
-            // Durum kontrolü: Pasif veya İade Edildi değilse ceza hesapla
             if (o.durum !== "Pasif" && o.durum !== "Iade Edildi") {
                 const iadeTarihi = new Date(o.iadeTarihi || o.iade_tarihi);
                 if (iadeTarihi < today) {
@@ -135,7 +122,6 @@ export const api = {
                     cezaMiktari = diffDays * FINE_PER_DAY;
                 }
             }
-            // Objeye ceza alanını ekle
             return { ...o, ceza: cezaMiktari };
         });
     },
@@ -161,18 +147,15 @@ export const api = {
             return;
         }
 
-        // console.log("Gönderilen Veri:", payload); // Hata ayıklama için açabilirsin
         return await request('/loans', 'POST', payload);
     },
 
     returnLoan: async (id) => {
-        // İade işlemi için Backend'deki DELETE metodunu çağırıyoruz
         await request(`/loans/${id}`, 'DELETE');
         return { success: true, message: "Kitap iade alındı." };
     },
 
    payFine: async (oduncId, tutar) => {
-        // ARTIK DELETE DEĞİL, POST İLE ÖZEL ENDPOINT'E GİDİYORUZ
         await request(`/loans/${oduncId}/pay`, 'POST');
         return { success: true, message: `Ödeme alındı (${tutar} TL) ve kitap iade edildi.` };
     },
@@ -187,27 +170,23 @@ export const api = {
     },
 
     // --- ÜYE İŞLEMLERİ ---
-    // Controller Endpoint: /members
     getMembers: async () => {
         return await request('/members');
     },
 
     registerMember: async (uyeData) => {
-        // Java Uye.java Modeli: uye_ad, uye_soyad, uyeEmail, uye_telefon, sifre
         const payload = {
             uye_ad: uyeData.uye_ad,
             uye_soyad: uyeData.uye_soyad,
-            uyeEmail: uyeData.uye_email || uyeData.uyeEmail, // Backend'de camelCase 'uyeEmail'
+            uyeEmail: uyeData.uye_email || uyeData.uyeEmail, 
             uye_telefon: uyeData.uye_telefon,
             sifre: uyeData.sifre,
-            // Eğer tarih boşsa bugünü ata
             uyeKayitTarihi: new Date().toISOString().split('T')[0]
         };
         return await request('/members', 'POST', payload);
     },
 
     verifyEmail: async (email, code) => {
-        // Backend'deki /api/verify endpoint'ine istek atar
         return await request('/verify', 'POST', { email, code });
     },
 
@@ -217,13 +196,11 @@ export const api = {
     },
 
     // --- PERSONEL İŞLEMLERİ ---
-    // Controller Endpoint: /staff
     getStaff: async () => {
         return await request('/staff');
     },
 
     addStaff: async (personelData) => {
-        // Java Personel.java Modeli: personel_ad, personel_soyad, kullaniciAdi, sifre, yetki
         const payload = {
             personel_ad: personelData.personel_ad,
             personel_soyad: personelData.personel_soyad,
