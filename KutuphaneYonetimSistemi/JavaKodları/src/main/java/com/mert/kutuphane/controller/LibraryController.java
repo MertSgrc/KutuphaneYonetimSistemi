@@ -27,7 +27,7 @@ public class LibraryController {
     // --- YARDIMCI METOD: MAIL GÖNDER ---
     private void sendVerificationEmail(String toEmail, String code) {
         SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom("SENIN_MAIL_ADRESIN@gmail.com"); // properties'deki mailin aynısı olmalı
+        message.setFrom("sigircimert039@gmail.com"); 
         message.setTo(toEmail);
         message.setSubject("Kütüphane Üyelik Doğrulama Kodu");
         message.setText("Merhaba,\n\nKayıt olduğunuz için teşekkürler. Doğrulama kodunuz: " + code + "\n\nİyi okumalar!");
@@ -129,15 +129,16 @@ public class LibraryController {
         return ResponseEntity.badRequest().body("Kullanıcı bulunamadı.");
     }
     
-   @DeleteMapping("/members/{id}")
+  @DeleteMapping("/members/{id}")
     public ResponseEntity<?> deleteMember(@PathVariable int id) {
         // 1. Üyenin üzerinde ödünç kitap var mı kontrol et
         List<Odunc> tumOduncler = oduncRepo.findAll();
         boolean oduncVarMi = false;
         
         for(Odunc o : tumOduncler) {
-            // Odunc tablosundaki uyeId ile silinmek istenen id eşleşiyor mu?
-            if(o.getUyeId() == id) {
+            // DÜZELTME BURADA: Sadece 'Aktif' (iade edilmemiş) olanları kontrol et
+            // Eski kod: if(o.getUyeId() == id)
+            if(o.getUyeId() == id && "Aktif".equals(o.getDurum())) { 
                 oduncVarMi = true;
                 break;
             }
@@ -152,7 +153,7 @@ public class LibraryController {
         uyeRepo.deleteById(id);
         return ResponseEntity.ok().build();
     }
-
+    
     @GetMapping("/books") public List<Kitap> getAllBooks() { return kitapRepo.findAll(); }
     @PostMapping("/books") public Kitap addBook(@RequestBody Kitap kitap) { return kitapRepo.save(kitap); }
     @DeleteMapping("/books/{id}") public void deleteBook(@PathVariable int id) { kitapRepo.deleteById(id); }

@@ -24,6 +24,8 @@ export const showToast = (message, type = 'info') => {
 
 document.addEventListener('DOMContentLoaded', () => {
 
+    localStorage.clear();
+
     if (!auth.checkSession()) {
         document.body.classList.add('login-mode');
     } else {
